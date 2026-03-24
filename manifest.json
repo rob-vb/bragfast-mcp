@@ -1,0 +1,47 @@
+{
+  "name": "bragfast",
+  "display_name": "Bragfast",
+  "description": "Generate branded release announcement images and videos",
+  "version": "0.1.0",
+  "author": "Bragfast",
+  "homepage": "https://bragfast.com",
+  "is_official": true,
+  "tools": [
+    {
+      "name": "bragfast_generate_release_images",
+      "description": "Generate branded release images"
+    },
+    {
+      "name": "bragfast_generate_release_video",
+      "description": "Generate branded release video"
+    },
+    {
+      "name": "bragfast_list_brands",
+      "description": "List available brands"
+    },
+    {
+      "name": "bragfast_list_templates",
+      "description": "List available templates"
+    },
+    {
+      "name": "bragfast_check_account",
+      "description": "Check account credits and plan"
+    },
+    {
+      "name": "bragfast_get_render_status",
+      "description": "Check render job status"
+    }
+  ],
+  "server": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@bragfast/mcp-server"]
+  },
+  "env": [
+    {
+      "name": "BRAGFAST_API_KEY",
+      "description": "Your Bragfast API key. Get one at https://bragfast.com/dashboard/api-keys",
+      "required": false
+    }
+  ]
+}
