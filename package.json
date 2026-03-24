@@ -1,0 +1,31 @@
+{
+  "name": "@bragfast/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for Bragfast — generate release images and videos from Claude",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "bragfast-mcp": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["mcp", "bragfast", "release", "images", "video"],
+  "license": "MIT",
+  "files": ["dist", "manifest.json"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
