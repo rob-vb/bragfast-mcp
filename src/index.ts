@@ -6,7 +6,7 @@ import { BragfastApiClient } from "./lib/api-client.js";
 import { generateImages } from "./tools/generate-images.js";
 import { generateVideo } from "./tools/generate-video.js";
 import { listBrands } from "./tools/list-brands.js";
-import { listTemplates } from "./tools/list-templates.js";
+import { listTemplates, getTemplate } from "./tools/list-templates.js";
 import { checkAccount } from "./tools/check-account.js";
 import { getRenderStatus } from "./tools/render-status.js";
 
@@ -180,13 +180,37 @@ server.registerTool("bragfast_list_brands", {
 server.registerTool("bragfast_list_templates", {
   title: "List Templates",
   description:
-    "List all available templates with their full config including object IDs. Use object IDs when composing slides for generate_release_images/video.",
+    "List available templates (name, ID, default status). Use bragfast_get_template to get the full config with object IDs for a specific template.",
   inputSchema: z.object({}),
 }, async () => {
   try {
     const result = await listTemplates(client);
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+    };
+  } catch (err) {
+    return {
+      content: [
+        { type: "text" as const, text: `Error: ${(err as Error).message}` },
+      ],
+      isError: true,
+    };
+  }
+});
+
+// 4b. bragfast_get_template
+server.registerTool("bragfast_get_template", {
+  title: "Get Template",
+  description:
+    "Get the full config for a specific template, including object IDs needed to compose slides for generate_release_images/video.",
+  inputSchema: z.object({
+    template_id: z.string().describe("Template ID from bragfast_list_templates (e.g. standard-browser, hero, or tmpl_*)"),
+  }),
+}, async (input) => {
+  try {
+    const template = await getTemplate(client, input);
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(template, null, 2) }],
     };
   } catch (err) {
     return {

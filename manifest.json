@@ -21,7 +21,11 @@
     },
     {
       "name": "bragfast_list_templates",
-      "description": "List available templates"
+      "description": "List available templates (summary)"
+    },
+    {
+      "name": "bragfast_get_template",
+      "description": "Get full template config with object IDs"
     },
     {
       "name": "bragfast_check_account",

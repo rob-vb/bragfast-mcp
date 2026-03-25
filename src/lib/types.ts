@@ -74,6 +74,13 @@ export interface TemplateRecord {
   updated_at: string;
 }
 
+export interface TemplateSummary {
+  id: string;
+  name: string;
+  is_default: boolean;
+  preview_url: string | null;
+}
+
 export interface AccountInfo {
   credits_remaining: number;
   plan: string;
