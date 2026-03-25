@@ -68,4 +68,21 @@ export class BragfastApiClient {
     }
     return handleResponse<T>(res);
   }
+
+  async postMultipart<T>(path: string, formData: FormData): Promise<T> {
+    const apiKey = await resolveApiKey();
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: formData,
+      });
+    } catch {
+      throw new Error("Cannot reach Bragfast API. Check your internet connection.");
+    }
+    return handleResponse<T>(res);
+  }
 }

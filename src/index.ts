@@ -9,6 +9,7 @@ import { listBrands } from "./tools/list-brands.js";
 import { listTemplates, getTemplate } from "./tools/list-templates.js";
 import { checkAccount } from "./tools/check-account.js";
 import { getRenderStatus } from "./tools/render-status.js";
+import { uploadImage } from "./tools/upload-image.js";
 
 const server = new McpServer({
   name: "bragfast",
@@ -258,6 +259,32 @@ server.registerTool("bragfast_get_render_status", {
 }, async (input) => {
   try {
     const result = await getRenderStatus(client, input);
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+    };
+  } catch (err) {
+    return {
+      content: [
+        { type: "text" as const, text: `Error: ${(err as Error).message}` },
+      ],
+      isError: true,
+    };
+  }
+});
+
+// 7. bragfast_upload_image
+server.registerTool("bragfast_upload_image", {
+  title: "Upload Image",
+  description:
+    "Upload a local image file to Bragfast for use as image_url in slides. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). If you already have a public URL, skip this and pass it directly as image_url.",
+  inputSchema: z.object({
+    file_path: z
+      .string()
+      .describe("Absolute path to the local image file to upload"),
+  }),
+}, async (input) => {
+  try {
+    const result = await uploadImage(client, input);
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
     };
