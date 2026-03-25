@@ -4,7 +4,7 @@
   "description": "Generate branded release announcement images and videos",
   "version": "0.1.0",
   "author": "Bragfast",
-  "homepage": "https://bragfast.com",
+  "homepage": "https://brag.fast",
   "is_official": true,
   "tools": [
     {
@@ -40,7 +40,7 @@
   "env": [
     {
       "name": "BRAGFAST_API_KEY",
-      "description": "Your Bragfast API key. Get one at https://bragfast.com/dashboard/api-keys",
+      "description": "Your Bragfast API key. Get one at https://brag.fast/dashboard/account",
       "required": false
     }
   ]

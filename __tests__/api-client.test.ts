@@ -19,7 +19,7 @@ import * as credentials from "../src/lib/credentials.js";
 const mockResolveApiKey = vi.mocked(auth.resolveApiKey);
 const mockDeleteCredentials = vi.mocked(credentials.deleteCredentials);
 
-const TEST_BASE_URL = "https://test.bragfast.com/api/v1";
+const TEST_BASE_URL = "https://test.brag.fast/api/v1";
 
 function makeResponse(
   status: number,

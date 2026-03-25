@@ -4,7 +4,7 @@ import { listBrands } from "../src/tools/list-brands.js";
 import type { BrandRecord } from "../src/lib/types.js";
 
 function makeClient() {
-  const client = new BragfastApiClient("https://test.bragfast.com/api/v1");
+  const client = new BragfastApiClient("https://test.brag.fast/api/v1");
   client.get = vi.fn();
   return client;
 }

@@ -1,6 +1,6 @@
 # @bragfast/mcp-server
 
-MCP server for [Bragfast](https://bragfast.com) — generate branded release announcement images and videos from Claude.
+MCP server for [Bragfast](https://brag.fast) — generate branded release announcement images and videos from Claude.
 
 ## Quick Start
 
@@ -34,7 +34,7 @@ Use the same stdio config — `npx -y @bragfast/mcp-server` with `BRAGFAST_API_K
 
 ## Authentication
 
-Get an API key at [bragfast.com/dashboard/api-keys](https://bragfast.com/dashboard/api-keys).
+Get an API key at [brag.fast/dashboard/account](https://brag.fast/dashboard/account).
 
 **Option 1: Environment variable**
 
@@ -72,8 +72,8 @@ Claude: [calls bragfast_list_brands → picks your brand]
         [calls bragfast_get_render_status → returns image URLs]
 
 Here are your release images:
-- Landscape: https://bragfast.com/...
-- Square: https://bragfast.com/...
+- Landscape: https://brag.fast/...
+- Square: https://brag.fast/...
 ```
 
 ## Development

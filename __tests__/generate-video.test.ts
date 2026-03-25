@@ -4,7 +4,7 @@ import { generateVideo } from "../src/tools/generate-video.js";
 import type { ReleaseResult } from "../src/lib/types.js";
 
 function makeClient() {
-  const client = new BragfastApiClient("https://test.bragfast.com/api/v1");
+  const client = new BragfastApiClient("https://test.brag.fast/api/v1");
   client.post = vi.fn();
   return client;
 }

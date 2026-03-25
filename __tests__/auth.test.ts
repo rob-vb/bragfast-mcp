@@ -48,6 +48,6 @@ describe("resolveApiKey", () => {
       "Not authenticated. Run: npx @bragfast/mcp-server login"
     );
     await expect(resolveApiKey()).rejects.toThrow("BRAGFAST_API_KEY");
-    await expect(resolveApiKey()).rejects.toThrow("https://bragfast.com/dashboard/api-keys");
+    await expect(resolveApiKey()).rejects.toThrow("https://brag.fast/dashboard/account");
   });
 });

@@ -3,7 +3,7 @@ import { BragfastApiClient } from "../src/lib/api-client.js";
 import { checkAccount } from "../src/tools/check-account.js";
 
 function makeClient() {
-  const client = new BragfastApiClient("https://test.bragfast.com/api/v1");
+  const client = new BragfastApiClient("https://test.brag.fast/api/v1");
   client.get = vi.fn();
   return client;
 }

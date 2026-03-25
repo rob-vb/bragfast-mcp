@@ -12,6 +12,6 @@ export async function resolveApiKey(): Promise<string> {
   }
 
   throw new Error(
-    "Not authenticated. Run: npx @bragfast/mcp-server login\nOr set BRAGFAST_API_KEY env var.\nCreate a key at: https://bragfast.com/dashboard/api-keys"
+    "Not authenticated. Run: npx @bragfast/mcp-server login\nOr set BRAGFAST_API_KEY env var.\nCreate a key at: https://brag.fast/dashboard/account"
   );
 }

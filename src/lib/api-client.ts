@@ -1,7 +1,7 @@
 import { resolveApiKey } from "./auth.js";
 import { deleteCredentials } from "./credentials.js";
 
-const DEFAULT_BASE_URL = "https://bragfast.com/api/v1";
+const DEFAULT_BASE_URL = "https://brag.fast/api/v1";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (res.ok) {

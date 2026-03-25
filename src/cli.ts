@@ -6,7 +6,7 @@ const [command] = process.argv.slice(2);
 async function login() {
   // For v1, just print instructions. Browser-based login is v1.1.
   console.log(
-    "To authenticate, create an API key at: https://bragfast.com/dashboard/api-keys"
+    "To authenticate, create an API key at: https://brag.fast/dashboard/account"
   );
   console.log("");
   console.log("Then either:");
