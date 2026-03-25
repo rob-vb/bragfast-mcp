@@ -34,21 +34,15 @@ Use the same stdio config — `npx -y @bragfast/mcp-server` with `BRAGFAST_API_K
 
 ## Authentication
 
-Get an API key at [brag.fast/dashboard/account](https://brag.fast/dashboard/account).
-
-**Option 1: Environment variable**
-
-```bash
-export BRAGFAST_API_KEY=your-api-key
-```
-
-**Option 2: Login command**
+Get an API key at [brag.fast/dashboard/account](https://brag.fast/dashboard/account), then run:
 
 ```bash
 npx @bragfast/mcp-server login <your-api-key>
 ```
 
-Stores the key in `~/.bragfast/credentials.json`.
+This stores the key in `~/.bragfast/credentials.json` and the MCP server picks it up automatically.
+
+Alternatively, set the `BRAGFAST_API_KEY` environment variable.
 
 ## Tools
 
