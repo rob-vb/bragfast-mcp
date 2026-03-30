@@ -7,7 +7,7 @@ MCP server for [Bragfast](https://brag.fast) — generate branded release announ
 ### Claude Code
 
 ```bash
-claude mcp add bragfast -- npx -y @bragfast/mcp-server
+claude mcp add bragfast -- npx -y @bragfast/mcp-server@latest
 ```
 
 ### Claude Desktop
@@ -19,7 +19,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
   "mcpServers": {
     "bragfast": {
       "command": "npx",
-      "args": ["-y", "@bragfast/mcp-server"],
+      "args": ["-y", "@bragfast/mcp-server@latest"],
       "env": {
         "BRAGFAST_API_KEY": "your-api-key-here"
       }
@@ -30,7 +30,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 
 ### Cursor / Windsurf / other MCP clients
 
-Use the same stdio config — `npx -y @bragfast/mcp-server` with `BRAGFAST_API_KEY` set.
+Use the same stdio config — `npx -y @bragfast/mcp-server@latest` with `BRAGFAST_API_KEY` set.
 
 ## Authentication
 
