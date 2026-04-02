@@ -32,6 +32,10 @@
       "description": "Check account credits and plan"
     },
     {
+      "name": "bragfast_upload_image",
+      "description": "Upload a local image for use in slides"
+    },
+    {
       "name": "bragfast_get_render_status",
       "description": "Check render job status"
     }
@@ -39,7 +43,7 @@
   "server": {
     "type": "stdio",
     "command": "npx",
-    "args": ["-y", "@bragfast/mcp-server"]
+    "args": ["--prefer-online", "-y", "@bragfast/mcp-server@latest"]
   },
   "env": [
     {

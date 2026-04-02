@@ -16,6 +16,7 @@ export interface GenerateImagesInput {
         text?: string;
         image_url?: string;
         font_family?: string;
+        font_weight?: string;
         color?: string;
         image_frame?: "browser" | "mobile" | "none";
         image_frame_color?: string;
