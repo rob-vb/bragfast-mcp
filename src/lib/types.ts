@@ -21,7 +21,7 @@ export interface ObjectModification {
   id: string;
   text?: string;
   font_family?: string;
-  font_weight?: string;
+  font_weight?: number;
   color?: string;
   image_url?: string;
   image_frame?: "browser" | "mobile" | "none";

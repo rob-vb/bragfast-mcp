@@ -57,7 +57,7 @@ server.registerTool("bragfast_generate_release_images", {
                     text: z.string().optional(),
                     image_url: z.string().optional(),
                     font_family: z.string().optional(),
-                    font_weight: z.string().optional(),
+                    font_weight: z.number().optional(),
                     color: z.string().optional(),
                     image_frame: z
                       .enum(["browser", "mobile", "none"])
@@ -119,7 +119,7 @@ server.registerTool("bragfast_generate_release_video", {
                   text: z.string().optional(),
                   image_url: z.string().optional(),
                   font_family: z.string().optional(),
-                  font_weight: z.string().optional(),
+                  font_weight: z.number().optional(),
                   color: z.string().optional(),
                   image_frame: z
                     .enum(["browser", "mobile", "none"])

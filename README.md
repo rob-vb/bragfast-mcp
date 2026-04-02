@@ -53,6 +53,7 @@ Alternatively, set the `BRAGFAST_API_KEY` environment variable.
 | `bragfast_list_brands` | List your brands (colors, logos, fonts). |
 | `bragfast_list_templates` | List available templates with full config and object IDs. |
 | `bragfast_check_account` | Check credits remaining and plan. |
+| `bragfast_upload_image` | Upload a local image file for use in slides. Returns a hosted URL. |
 | `bragfast_get_render_status` | Poll a `cook_id` for completion. Returns image/video URLs when done. |
 
 ## Example
