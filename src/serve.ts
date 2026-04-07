@@ -45,8 +45,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Request logger
-app.use((req: Request, _res: Response, next: NextFunction) => {
-  console.log(`${req.method} ${req.path} - ${req.headers["user-agent"] ?? "no-ua"}`);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.on("finish", () => {
+    console.log(`${req.method} ${req.path} → ${res.statusCode} [${req.headers["user-agent"] ?? "no-ua"}]`);
+  });
   next();
 });
 
