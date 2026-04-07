@@ -24,6 +24,7 @@ const provider = new BragfastOAuthProvider({
 });
 
 const app = express();
+app.set("trust proxy", 1); // Cloudflare / reverse proxy
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
