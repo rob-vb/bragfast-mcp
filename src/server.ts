@@ -354,5 +354,92 @@ export function createBragfastServer({
     );
   }
 
+  // Guided workflow prompt — for Claude Desktop, Claude.ai, and other MCP clients
+  // that don't have the bragfast skill available.
+  server.registerPrompt(
+    "bragfast",
+    {
+      title: "Generate Release Announcement",
+      description:
+        "Guided workflow to create branded release images or video from your recent work.",
+    },
+    () => ({
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Help me create release announcement content using the bragfast MCP tools. Follow this workflow step by step:
+
+## Step 1: Gather Content
+
+Try these sources in order:
+- **Git history (preferred):** If in a git repo, look at recent changes. On a feature branch, diff against the default branch. On main/master, check the last ~5 commits. Extract 3-5 announcement-worthy changes, prioritising user-facing features over internal refactors.
+- **Conversation context:** Look for features, bug fixes, version numbers, or changelogs already mentioned.
+- **Ask me:** If neither yields content, ask: "What should the release images cover? You can describe the features, paste a changelog, or share a GitHub release URL."
+
+Present the proposed slides for my approval before continuing:
+\`\`\`
+Here's what I'd put on the slides:
+
+1. **[Title]** — "[Description]"
+2. **[Title]** — "[Description]"
+3. **[Title]** — "[Description]"
+
+You can edit, remove, or add slides — or say "looks good" to continue.
+\`\`\`
+
+After I approve, ask me:
+1. **Output type:** Images (static), Video (animated), or Both?
+2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
+3. **Screenshots:** Do I have screenshots to include? (local files, URLs, or text only)
+
+## Step 2: Brand & Template Setup
+
+Call \`bragfast_check_account\`, \`bragfast_list_brands\`, and \`bragfast_list_templates\` in parallel.
+
+- Warn me if credits are low before proceeding.
+- If only one brand exists, use it automatically. If multiple, pick the one matching the repo name. If unclear, ask me.
+- If no brands exist, ask for colors (background, text, primary as hex).
+
+Pick a template based on context:
+- Mobile work (React Native, Swift, Flutter) → \`*-mobile\` template
+- Web/dashboard/browser UI → \`*-browser\` template
+- Marketing, launches, or unclear → \`hero\` template
+
+Show your reasoning and let me confirm or change the choice.
+
+## Step 3: Compose Slides
+
+1. Call \`bragfast_get_template\` for the chosen template to get object IDs.
+2. For each slide, write a short punchy title (~40 chars max) and 1-2 line description.
+3. Map content to object IDs from the template config (\`title\`, \`description\`, \`image\`).
+4. Show the final slide plan and get my approval before generating.
+
+## Step 4: Generate
+
+**Important:** The \`formats\` parameter must be a JSON array of objects, not a string.
+
+**Polling rules — renders take time, do NOT poll too fast:**
+- Images: wait 60 seconds before first check, then 30 seconds between retries (max 5 attempts).
+- Video: wait 60 seconds before first check, then 30 seconds between retries (max 8 attempts).
+
+After results: show the image/video URLs, report credits used and remaining, and offer to generate in other formats or as video/images if I only did one.
+
+## Error Handling
+
+- **Not authenticated:** Tell me to connect the bragfast MCP server and authenticate.
+- **Insufficient credits:** Show credits needed and link to brag.fast for billing.
+- **Render fails:** Show the error — credits are auto-refunded.
+
+---
+
+Start now: check the git history (or ask me what to cover), then present the slide plan.`,
+          },
+        },
+      ],
+    })
+  );
+
   return server;
 }
