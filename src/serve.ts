@@ -73,11 +73,24 @@ app.options("/mcp", (_req: Request, res: Response) => {
   res.set(CORS_HEADERS).status(204).end();
 });
 
+// OAuth protected resource metadata — tells clients where to authenticate
+app.get("/.well-known/oauth-protected-resource", (_req: Request, res: Response) => {
+  res.json({
+    resource: `${BASE_URL}/mcp`,
+    authorization_servers: [BASE_URL],
+    bearer_methods_supported: ["header"],
+    scopes_supported: ["mcp"],
+  });
+});
+
 // Auth middleware for /mcp — verifies the Bearer token
 app.use("/mcp", async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Unauthorized" });
+    res
+      .status(401)
+      .set("WWW-Authenticate", `Bearer realm="${BASE_URL}", resource_metadata="${BASE_URL}/.well-known/oauth-protected-resource"`)
+      .json({ error: "Unauthorized" });
     return;
   }
   const token = authHeader.slice(7);
@@ -86,7 +99,10 @@ app.use("/mcp", async (req: Request, res: Response, next: NextFunction) => {
     (req as IncomingMessage & { auth?: AuthInfo }).auth = authInfo;
     next();
   } catch {
-    res.status(401).json({ error: "Invalid or expired token" });
+    res
+      .status(401)
+      .set("WWW-Authenticate", `Bearer realm="${BASE_URL}", error="invalid_token"`)
+      .json({ error: "Invalid or expired token" });
   }
 });
 
