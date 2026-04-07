@@ -114,9 +114,9 @@ export function renderLoginPage(params: LoginPageParams): string {
 </head>
 <body>
   <div class="card">
-    <div class="logo">Bragfast</div>
+    <div class="logo">brag.fast</div>
     <h1>Connect to Claude</h1>
-    <p>Enter your Bragfast API key to connect. Claude will be able to generate release images and videos on your behalf.</p>
+    <p>Enter your brag.fast API key to connect. Claude will be able to generate release images and videos on your behalf.</p>
     ${errorHtml}
     <form method="POST" action="/oauth/submit">
       <input type="hidden" name="client_id" value="${escapeHtml(clientId)}" />
@@ -128,7 +128,7 @@ export function renderLoginPage(params: LoginPageParams): string {
         type="password"
         id="api_key"
         name="api_key"
-        placeholder="bfk_..."
+        placeholder="bf_..."
         autocomplete="off"
         autofocus
         required

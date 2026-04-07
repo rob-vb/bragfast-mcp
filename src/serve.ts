@@ -58,7 +58,7 @@ app.use(
     provider,
     issuerUrl: new URL(BASE_URL),
     serviceDocumentationUrl: new URL("https://brag.fast/docs/mcp"),
-    resourceName: "Bragfast MCP Server",
+    resourceName: "brag.fast MCP Server",
   })
 );
 
