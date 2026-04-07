@@ -44,6 +44,12 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Request logger
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  console.log(`${req.method} ${req.path} - ${req.headers["user-agent"] ?? "no-ua"}`);
+  next();
+});
+
 // OAuth 2.1 endpoints: /.well-known/oauth-authorization-server, /authorize, /token, /register, /revoke
 app.use(
   mcpAuthRouter({
