@@ -25,6 +25,22 @@ const provider = new BragfastOAuthProvider({
 
 const app = express();
 app.set("trust proxy", 1); // Cloudflare / reverse proxy
+
+// Global CORS — must be before all routes so OAuth endpoints are covered
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.set({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Mcp-Session-Id, MCP-Protocol-Version",
+    "Access-Control-Expose-Headers": "Mcp-Session-Id",
+  });
+  if (_req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
