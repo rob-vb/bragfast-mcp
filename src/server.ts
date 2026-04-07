@@ -1,0 +1,358 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod/v4";
+import { BragfastApiClient } from "./lib/api-client.js";
+import { generateImages } from "./tools/generate-images.js";
+import { generateVideo } from "./tools/generate-video.js";
+import { listBrands } from "./tools/list-brands.js";
+import { listTemplates, getTemplate } from "./tools/list-templates.js";
+import { checkAccount } from "./tools/check-account.js";
+import { getRenderStatus } from "./tools/render-status.js";
+import { uploadImage, uploadImageFromBase64 } from "./tools/upload-image.js";
+
+export type ServerMode = "stdio" | "http";
+
+export function createBragfastServer({
+  apiClient,
+  mode,
+}: {
+  apiClient: BragfastApiClient;
+  mode: ServerMode;
+}): McpServer {
+  const server = new McpServer({
+    name: "bragfast",
+    version: "0.1.0",
+  });
+
+  // 1. bragfast_generate_release_images
+  server.registerTool(
+    "bragfast_generate_release_images",
+    {
+      title: "Generate Release Images",
+      description:
+        "Generate branded release announcement images. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion.",
+      inputSchema: z.object({
+        brand_id: z.string().optional().describe("Brand ID to use for styling"),
+        colors: z
+          .object({
+            background: z.string(),
+            text: z.string(),
+            primary: z.string(),
+          })
+          .optional()
+          .describe("Custom colors (hex). Required if no brand_id."),
+        name: z.string().optional().describe("Brand name override"),
+        logo_url: z.string().optional().describe("Logo URL override"),
+        font_family: z.string().optional().describe("Font family override"),
+        template: z
+          .string()
+          .optional()
+          .describe(
+            "Template ID (e.g. standard-browser, split-mobile, hero, or tmpl_*)"
+          ),
+        formats: z
+          .array(
+            z.object({
+              name: z
+                .enum(["landscape", "square", "portrait", "og"])
+                .describe("Output format"),
+              slides: z.array(
+                z.object({
+                  objects: z
+                    .array(
+                      z.object({
+                        id: z.string().describe("Object ID from template config"),
+                        text: z.string().optional(),
+                        image_url: z.string().optional(),
+                        font_family: z.string().optional(),
+                        font_weight: z.number().optional(),
+                        color: z.string().optional(),
+                        image_frame: z
+                          .enum(["browser", "mobile", "none"])
+                          .optional(),
+                        image_frame_color: z.string().optional(),
+                      })
+                    )
+                    .optional(),
+                })
+              ),
+            })
+          )
+          .describe("Formats and slide content"),
+        metadata: z.string().optional().describe("Arbitrary metadata string"),
+        webhook_url: z
+          .string()
+          .optional()
+          .describe("Webhook URL for completion notification"),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await generateImages(apiClient, input);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 2. bragfast_generate_release_video
+  server.registerTool(
+    "bragfast_generate_release_video",
+    {
+      title: "Generate Release Video",
+      description:
+        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Does not support 'og' format.",
+      inputSchema: z.object({
+        brand_id: z.string().optional(),
+        colors: z
+          .object({ background: z.string(), text: z.string(), primary: z.string() })
+          .optional(),
+        name: z.string().optional(),
+        logo_url: z.string().optional(),
+        font_family: z.string().optional(),
+        template: z.string().optional(),
+        formats: z.array(
+          z.object({
+            name: z.enum(["landscape", "square", "portrait"]),
+            slides: z.array(
+              z.object({
+                objects: z
+                  .array(
+                    z.object({
+                      id: z.string(),
+                      text: z.string().optional(),
+                      image_url: z.string().optional(),
+                      font_family: z.string().optional(),
+                      font_weight: z.number().optional(),
+                      color: z.string().optional(),
+                      image_frame: z
+                        .enum(["browser", "mobile", "none"])
+                        .optional(),
+                      image_frame_color: z.string().optional(),
+                    })
+                  )
+                  .optional(),
+              })
+            ),
+          })
+        ),
+        video: z
+          .union([z.literal(true), z.object({ duration: z.number().optional() })])
+          .optional()
+          .describe("Video options. Defaults to true."),
+        metadata: z.string().optional(),
+        webhook_url: z.string().optional(),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await generateVideo(apiClient, input);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 3. bragfast_list_brands
+  server.registerTool(
+    "bragfast_list_brands",
+    {
+      title: "List Brands",
+      description: "List all brands associated with your Bragfast account.",
+      inputSchema: z.object({}),
+    },
+    async () => {
+      try {
+        const brands = await listBrands(apiClient);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(brands, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 4. bragfast_list_templates
+  server.registerTool(
+    "bragfast_list_templates",
+    {
+      title: "List Templates",
+      description:
+        "List available templates (name, ID, default status). Use bragfast_get_template to get the full config with object IDs for a specific template.",
+      inputSchema: z.object({}),
+    },
+    async () => {
+      try {
+        const result = await listTemplates(apiClient);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 4b. bragfast_get_template
+  server.registerTool(
+    "bragfast_get_template",
+    {
+      title: "Get Template",
+      description:
+        "Get the full config for a specific template, including object IDs needed to compose slides for generate_release_images/video.",
+      inputSchema: z.object({
+        template_id: z
+          .string()
+          .describe(
+            "Template ID from bragfast_list_templates (e.g. standard-browser, hero, or tmpl_*)"
+          ),
+      }),
+    },
+    async (input) => {
+      try {
+        const template = await getTemplate(apiClient, input);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(template, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 5. bragfast_check_account
+  server.registerTool(
+    "bragfast_check_account",
+    {
+      title: "Check Account",
+      description: "Check your Bragfast account credits and plan.",
+      inputSchema: z.object({}),
+    },
+    async () => {
+      try {
+        const info = await checkAccount(apiClient);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(info, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 6. bragfast_get_render_status
+  server.registerTool(
+    "bragfast_get_render_status",
+    {
+      title: "Get Render Status",
+      description:
+        "Check the status of a render job. Returns status, and image/video URLs when complete.",
+      inputSchema: z.object({
+        cook_id: z
+          .string()
+          .describe(
+            "The cook_id returned from generate_release_images or generate_release_video"
+          ),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await getRenderStatus(apiClient, input);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 7. bragfast_upload_image
+  if (mode === "stdio") {
+    server.registerTool(
+      "bragfast_upload_image",
+      {
+        title: "Upload Image",
+        description:
+          "Upload a local image file to Bragfast for use as image_url in slides. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). If you already have a public URL, skip this and pass it directly as image_url.",
+        inputSchema: z.object({
+          file_path: z
+            .string()
+            .describe("Absolute path to the local image file to upload"),
+        }),
+      },
+      async (input) => {
+        try {
+          const result = await uploadImage(apiClient, input);
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+          };
+        } catch (err) {
+          return {
+            content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+  } else {
+    server.registerTool(
+      "bragfast_upload_image",
+      {
+        title: "Upload Image",
+        description:
+          "Upload an image to Bragfast for use as image_url in slides. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). Pass image_base64 with the base64-encoded file content (e.g. from a pasted image), and filename with the original filename including extension. If you already have a public URL, skip this and pass it directly as image_url.",
+        inputSchema: z.object({
+          image_base64: z
+            .string()
+            .describe("Base64-encoded image file content"),
+          filename: z
+            .string()
+            .describe("Original filename with extension (e.g. screenshot.png)"),
+        }),
+      },
+      async (input) => {
+        try {
+          const result = await uploadImageFromBase64(apiClient, input);
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+          };
+        } catch (err) {
+          return {
+            content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+            isError: true,
+          };
+        }
+      }
+    );
+  }
+
+  return server;
+}

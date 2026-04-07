@@ -30,13 +30,24 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export class BragfastApiClient {
   private baseUrl: string;
+  private directToken?: string;
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl ?? process.env.BRAGFAST_API_URL ?? DEFAULT_BASE_URL;
   }
 
+  static withToken(apiKey: string, baseUrl?: string): BragfastApiClient {
+    const client = new BragfastApiClient(baseUrl);
+    client.directToken = apiKey;
+    return client;
+  }
+
+  private async resolveKey(): Promise<string> {
+    return this.directToken ?? resolveApiKey();
+  }
+
   async get<T>(path: string): Promise<T> {
-    const apiKey = await resolveApiKey();
+    const apiKey = await this.resolveKey();
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
@@ -52,7 +63,7 @@ export class BragfastApiClient {
   }
 
   async post<T>(path: string, body: unknown): Promise<T> {
-    const apiKey = await resolveApiKey();
+    const apiKey = await this.resolveKey();
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
@@ -70,7 +81,7 @@ export class BragfastApiClient {
   }
 
   async postMultipart<T>(path: string, formData: FormData): Promise<T> {
-    const apiKey = await resolveApiKey();
+    const apiKey = await this.resolveKey();
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {

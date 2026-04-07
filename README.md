@@ -4,6 +4,29 @@ MCP server for [Bragfast](https://brag.fast) — generate branded release announ
 
 ## Quick Start
 
+### Claude Desktop / Claude.ai / Cowork
+
+1. Open the app and go to **Settings → Connectors → Add Custom Connector**
+2. Paste this URL:
+
+```
+https://mcp.brag.fast/mcp
+```
+
+3. Sign in with your Bragfast API key when prompted.
+
+### Claude Code
+
+```bash
+claude mcp add bragfast --transport http https://mcp.brag.fast/mcp
+```
+
+---
+
+## Alternative: Local Installation
+
+If you prefer to run the MCP server locally (required for `bragfast_upload_image` with local file paths):
+
 ### Claude Code
 
 ```bash
@@ -28,11 +51,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 }
 ```
 
-### Cursor / Windsurf / other MCP clients
-
-Use the same stdio config — `npx -y @bragfast/mcp-server@latest` with `BRAGFAST_API_KEY` set.
-
-## Authentication
+### Authentication (local mode)
 
 Get an API key at [brag.fast/dashboard/account](https://brag.fast/dashboard/account), then run:
 
@@ -40,9 +59,9 @@ Get an API key at [brag.fast/dashboard/account](https://brag.fast/dashboard/acco
 npx @bragfast/mcp-server login <your-api-key>
 ```
 
-This stores the key in `~/.bragfast/credentials.json` and the MCP server picks it up automatically.
+Or set the `BRAGFAST_API_KEY` environment variable.
 
-Alternatively, set the `BRAGFAST_API_KEY` environment variable.
+---
 
 ## Tools
 
@@ -51,9 +70,10 @@ Alternatively, set the `BRAGFAST_API_KEY` environment variable.
 | `bragfast_generate_release_images` | Generate branded release images. Returns a `cook_id` to poll. |
 | `bragfast_generate_release_video` | Generate a branded release video. Returns a `cook_id` to poll. |
 | `bragfast_list_brands` | List your brands (colors, logos, fonts). |
-| `bragfast_list_templates` | List available templates with full config and object IDs. |
+| `bragfast_list_templates` | List available templates. |
+| `bragfast_get_template` | Get full template config with object IDs. |
 | `bragfast_check_account` | Check credits remaining and plan. |
-| `bragfast_upload_image` | Upload a local image file for use in slides. Returns a hosted URL. |
+| `bragfast_upload_image` | Upload an image for use in slides. Returns a hosted URL. In remote mode, accepts base64-encoded image data (e.g. a pasted screenshot). In local mode, accepts a file path. |
 | `bragfast_get_render_status` | Poll a `cook_id` for completion. Returns image/video URLs when done. |
 
 ## Example
@@ -71,13 +91,38 @@ Here are your release images:
 - Square: https://brag.fast/...
 ```
 
+## Self-Hosting
+
+To run the HTTP server on your own infrastructure:
+
+```bash
+git clone https://github.com/rob-vb/bragfast-mcp.git
+cd bragfast-mcp
+npm ci
+npm run build
+cp .env.example .env
+# Edit .env with your BASE_URL, etc.
+npm run serve
+```
+
+Environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Port to listen on |
+| `BASE_URL` | `http://localhost:3000` | Public URL (used in OAuth metadata) |
+| `BRAGFAST_API_URL` | `https://brag.fast/api/v1` | Bragfast API base URL |
+| `OAUTH_CLIENTS_FILE` | `./data/clients.json` | Path to persist OAuth clients |
+
+Use nginx or Caddy as a reverse proxy for HTTPS. Manage the process with `pm2` or `systemd`.
+
 ## Development
 
 ```bash
 git clone https://github.com/rob-vb/bragfast-mcp.git
 cd bragfast-mcp
 npm install
-npm test        # 35 tests
+npm test        # 37 tests
 npm run build   # compile to dist/
 ```
 
