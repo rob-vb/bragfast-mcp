@@ -52,6 +52,19 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Protected resource metadata at root well-known path for clients that
+// don't support path-aware discovery (RFC 9728 §1.1), e.g. Smithery.
+app.get("/.well-known/oauth-protected-resource", (_req: Request, res: Response) => {
+  res.json({
+    resource: `${BASE_URL}/mcp`,
+    authorization_servers: [BASE_URL],
+    bearer_methods_supported: ["header"],
+    scopes_supported: ["mcp"],
+    resource_name: "brag.fast MCP Server",
+    resource_documentation: "https://brag.fast/docs/mcp",
+  });
+});
+
 // OAuth 2.1 endpoints: /.well-known/oauth-authorization-server, /authorize, /token, /register, /revoke
 app.use(
   mcpAuthRouter({
