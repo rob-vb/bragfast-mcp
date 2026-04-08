@@ -108,7 +108,7 @@ app.get("/.well-known/oauth-protected-resource", (_req: Request, res: Response) 
   });
 });
 
-// Auth middleware for /mcp — verifies the Bearer token
+// Auth middleware for /mcp — verifies Bearer token (OAuth or direct API key)
 app.use("/mcp", async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
@@ -129,6 +129,43 @@ app.use("/mcp", async (req: Request, res: Response, next: NextFunction) => {
       .set("WWW-Authenticate", `Bearer realm="${BASE_URL}", error="invalid_token"`)
       .json({ error: "Invalid or expired token" });
   }
+});
+
+// Gateway endpoint — direct API key auth, no OAuth discovery.
+// For proxies like Smithery that pass the API key as a header.
+app.options("/gateway", (_req: Request, res: Response) => {
+  res.set(CORS_HEADERS).status(204).end();
+});
+
+app.all("/gateway", async (req: Request, res: Response) => {
+  res.set(CORS_HEADERS);
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Missing Authorization: Bearer <api_key> header" });
+    return;
+  }
+  const apiKey = authHeader.slice(7);
+
+  // Validate the API key against the Bragfast API
+  const verifyRes = await fetch(`${BRAGFAST_API_URL}/account`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!verifyRes.ok) {
+    res.status(401).json({ error: "Invalid API key" });
+    return;
+  }
+
+  const apiClient = BragfastApiClient.withToken(apiKey, BRAGFAST_API_URL);
+  const mcpServer = createBragfastServer({ apiClient, mode: "http" });
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
+  await mcpServer.connect(transport);
+  await transport.handleRequest(
+    req as unknown as IncomingMessage & { auth?: AuthInfo },
+    res as unknown as import("http").ServerResponse,
+    req.body
+  );
 });
 
 // MCP transport handler
