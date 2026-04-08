@@ -57,7 +57,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.get("/.well-known/oauth-protected-resource", (_req: Request, res: Response) => {
   res.json({
     resource: `${BASE_URL}/mcp`,
-    authorization_servers: [BASE_URL],
+    authorization_servers: [new URL(BASE_URL).href],
     bearer_methods_supported: ["header"],
     scopes_supported: ["mcp"],
     resource_name: "brag.fast MCP Server",
