@@ -7,16 +7,12 @@ import { listBrands } from "./tools/list-brands.js";
 import { listTemplates, getTemplate } from "./tools/list-templates.js";
 import { checkAccount } from "./tools/check-account.js";
 import { getRenderStatus } from "./tools/render-status.js";
-import { uploadImage, uploadImageFromBase64 } from "./tools/upload-image.js";
-
-export type ServerMode = "stdio" | "http";
+import { uploadImage } from "./tools/upload-image.js";
 
 export function createBragfastServer({
   apiClient,
-  mode,
 }: {
   apiClient: BragfastApiClient;
-  mode: ServerMode;
 }): McpServer {
   const server = new McpServer({
     name: "bragfast",
@@ -295,64 +291,41 @@ export function createBragfastServer({
   );
 
   // 7. bragfast_upload_image
-  if (mode === "stdio") {
-    server.registerTool(
-      "bragfast_upload_image",
-      {
-        title: "Upload Image",
-        description:
-          "Upload a local image file to Bragfast for use as image_url in slides. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). If you already have a public URL, skip this and pass it directly as image_url.",
-        inputSchema: z.object({
-          file_path: z
-            .string()
-            .describe("Absolute path to the local image file to upload"),
-        }),
-      },
-      async (input) => {
-        try {
-          const result = await uploadImage(apiClient, input);
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          };
-        } catch (err) {
-          return {
-            content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
-            isError: true,
-          };
-        }
+  server.registerTool(
+    "bragfast_upload_image",
+    {
+      title: "Upload Image",
+      description:
+        "Upload an image to Bragfast for use as image_url in slides. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). Provide either file_path for a local file, or image_base64 + filename for small images (logos, icons). IMPORTANT: Do NOT pass large base64 strings — they will be truncated and produce corrupted uploads. For large images (photos, screenshots), ask the user to upload to a free service like https://postimg.cc and paste the URL, then pass it directly as image_url in the slide. If you already have a public URL, skip this tool entirely and use it as image_url.",
+      inputSchema: z.object({
+        file_path: z
+          .string()
+          .optional()
+          .describe("Absolute path to a local image file"),
+        image_base64: z
+          .string()
+          .optional()
+          .describe("Base64-encoded image file content"),
+        filename: z
+          .string()
+          .optional()
+          .describe("Filename with extension (required with image_base64, e.g. screenshot.png)"),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await uploadImage(apiClient, input);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
       }
-    );
-  } else {
-    server.registerTool(
-      "bragfast_upload_image",
-      {
-        title: "Upload Image",
-        description:
-          "Upload an image to Bragfast for use as image_url in slides. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). Pass image_base64 with the base64-encoded file content (e.g. from a pasted image), and filename with the original filename including extension. If you already have a public URL, skip this and pass it directly as image_url.",
-        inputSchema: z.object({
-          image_base64: z
-            .string()
-            .describe("Base64-encoded image file content"),
-          filename: z
-            .string()
-            .describe("Original filename with extension (e.g. screenshot.png)"),
-        }),
-      },
-      async (input) => {
-        try {
-          const result = await uploadImageFromBase64(apiClient, input);
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          };
-        } catch (err) {
-          return {
-            content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
-            isError: true,
-          };
-        }
-      }
-    );
-  }
+    }
+  );
 
   // Guided workflow prompt — for Claude Desktop, Claude.ai, and other MCP clients
   // that don't have the bragfast skill available.
@@ -392,7 +365,7 @@ You can edit, remove, or add slides — or say "looks good" to continue.
 After I approve, ask me:
 1. **Output type:** Images (static), Video (animated), or Both?
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
-3. **Screenshots:** Do I have screenshots to include? (local files, URLs, or text only)
+3. **Screenshots:** Do I have screenshots to include? If so, I can provide a public URL (pass directly as \`image_url\` in the slide) or upload to https://postimg.cc and paste the link. For small images like logos, base64 via \`bragfast_upload_image\` works. Do NOT attempt to pass large base64 strings — they will be truncated.
 
 ## Step 2: Brand & Template Setup
 

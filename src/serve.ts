@@ -160,7 +160,7 @@ app.all("/gateway", async (req: Request, res: Response) => {
   }
 
   const apiClient = BragfastApiClient.withToken(apiKey, BRAGFAST_API_URL);
-  const mcpServer = createBragfastServer({ apiClient, mode: "http" });
+  const mcpServer = createBragfastServer({ apiClient });
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });
@@ -183,7 +183,7 @@ app.all("/mcp", async (req: Request, res: Response) => {
   }
 
   const apiClient = BragfastApiClient.withToken(apiKey, BRAGFAST_API_URL);
-  const mcpServer = createBragfastServer({ apiClient, mode: "http" });
+  const mcpServer = createBragfastServer({ apiClient });
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless
   });

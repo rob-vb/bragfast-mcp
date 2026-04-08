@@ -4,7 +4,7 @@ import { BragfastApiClient } from "./lib/api-client.js";
 import { createBragfastServer } from "./server.js";
 
 const client = new BragfastApiClient();
-const server = createBragfastServer({ apiClient: client, mode: "stdio" });
+const server = createBragfastServer({ apiClient: client });
 
 async function main() {
   const transport = new StdioServerTransport();
