@@ -318,7 +318,7 @@ export function createBragfastServer({
     {
       title: "Upload Image",
       description:
-        "Upload a small image (logos, icons) to Bragfast via base64. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). For large images (photos, screenshots), prefer bragfast_get_upload_url instead — it uses a presigned URL so the file uploads directly without passing through the context window. If you already have a public URL, skip upload entirely and use it as image_url in the slide.",
+        "ONLY for tiny images under 50KB (small logos, icons). DO NOT use for screenshots, photos, or user-attached images — use bragfast_get_upload_url instead. Accepts PNG, JPG, WebP, SVG. If you already have a public URL, skip upload entirely and use it as image_url in the slide.",
       inputSchema: z.object({
         file_path: z
           .string()
@@ -355,7 +355,7 @@ export function createBragfastServer({
     {
       title: "Get Upload URL",
       description:
-        "Get a presigned upload URL for uploading an image to Bragfast. Returns a curl command to upload the file directly — avoids passing large base64 through the context window. After uploading, the response includes the hosted URL to use as image_url in slides.",
+        "Upload an image to Bragfast. This is the DEFAULT upload method — use this for all images including screenshots, photos, and user-attached files. Returns a presigned URL and a curl command. Run the curl command to upload the file directly, then use the hosted URL as image_url in slides. DO NOT base64-encode images — use this tool instead.",
       inputSchema: z.object({
         filename: z
           .string()
