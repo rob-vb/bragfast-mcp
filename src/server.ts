@@ -8,6 +8,8 @@ import { listTemplates, getTemplate } from "./tools/list-templates.js";
 import { checkAccount } from "./tools/check-account.js";
 import { getRenderStatus } from "./tools/render-status.js";
 import { uploadImage } from "./tools/upload-image.js";
+import { getUploadUrl } from "./tools/get-upload-url.js";
+import { fetchImageAsBase64 } from "./lib/fetch-image.js";
 
 export function createBragfastServer({
   apiClient,
@@ -266,7 +268,7 @@ export function createBragfastServer({
     {
       title: "Get Render Status",
       description:
-        "Check the status of a render job. Returns status, and image/video URLs when complete.",
+        "Check the status of a render job. Returns status, and image/video URLs when complete. Completed image renders are displayed inline.",
       inputSchema: z.object({
         cook_id: z
           .string()
@@ -278,9 +280,29 @@ export function createBragfastServer({
     async (input) => {
       try {
         const result = await getRenderStatus(apiClient, input);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-        };
+        const content: Array<
+          | { type: "text"; text: string }
+          | { type: "image"; data: string; mimeType: string; annotations?: { audience: ("user" | "assistant")[] } }
+        > = [{ type: "text" as const, text: JSON.stringify(result, null, 2) }];
+
+        if (result.status === "completed" && result.images) {
+          const urls = Object.values(result.images).flatMap((f) => f.slides);
+          const fetches = await Promise.allSettled(
+            urls.map((url) => fetchImageAsBase64(url))
+          );
+          for (const settled of fetches) {
+            if (settled.status === "fulfilled" && settled.value) {
+              content.push({
+                type: "image" as const,
+                data: settled.value.data,
+                mimeType: settled.value.mimeType,
+                annotations: { audience: ["user"] },
+              });
+            }
+          }
+        }
+
+        return { content };
       } catch (err) {
         return {
           content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
@@ -296,7 +318,7 @@ export function createBragfastServer({
     {
       title: "Upload Image",
       description:
-        "Upload an image to Bragfast for use as image_url in slides. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). Provide either file_path for a local file, or image_base64 + filename for small images (logos, icons). IMPORTANT: Do NOT pass large base64 strings — they will be truncated and produce corrupted uploads. For large images (photos, screenshots), ask the user to upload to a free service like https://postimg.cc and paste the URL, then pass it directly as image_url in the slide. If you already have a public URL, skip this tool entirely and use it as image_url.",
+        "Upload a small image (logos, icons) to Bragfast via base64. Returns a hosted URL. Accepts PNG, JPG, WebP, SVG (max 5MB). For large images (photos, screenshots), prefer bragfast_get_upload_url instead — it uses a presigned URL so the file uploads directly without passing through the context window. If you already have a public URL, skip upload entirely and use it as image_url in the slide.",
       inputSchema: z.object({
         file_path: z
           .string()
@@ -315,6 +337,36 @@ export function createBragfastServer({
     async (input) => {
       try {
         const result = await uploadImage(apiClient, input);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 8. bragfast_get_upload_url
+  server.registerTool(
+    "bragfast_get_upload_url",
+    {
+      title: "Get Upload URL",
+      description:
+        "Get a presigned upload URL for uploading an image to Bragfast. Returns a curl command to upload the file directly — avoids passing large base64 through the context window. After uploading, the response includes the hosted URL to use as image_url in slides.",
+      inputSchema: z.object({
+        filename: z
+          .string()
+          .describe(
+            "Filename with extension (e.g. screenshot.png, photo.jpg)"
+          ),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await getUploadUrl(apiClient, input);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         };
@@ -365,7 +417,7 @@ You can edit, remove, or add slides — or say "looks good" to continue.
 After I approve, ask me:
 1. **Output type:** Images (static), Video (animated), or Both?
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
-3. **Screenshots:** Do I have screenshots to include? If so, I can provide a public URL (pass directly as \`image_url\` in the slide) or upload to https://postimg.cc and paste the link. For small images like logos, base64 via \`bragfast_upload_image\` works. Do NOT attempt to pass large base64 strings — they will be truncated.
+3. **Screenshots:** Do I have screenshots to include? If so, I can provide a public URL (pass directly as \`image_url\` in the slide) or attach the image in chat. For attached images or local files, use \`bragfast_get_upload_url\` to get a presigned upload URL, then run the curl command to upload directly — this avoids passing large base64 through the context window. For small images like logos, \`bragfast_upload_image\` with base64 also works.
 
 ## Step 2: Brand & Template Setup
 
