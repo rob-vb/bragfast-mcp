@@ -115,8 +115,8 @@ export function renderLoginPage(params: LoginPageParams): string {
 <body>
   <div class="card">
     <div class="logo">brag.fast</div>
-    <h1>Connect to Claude</h1>
-    <p>Enter your brag.fast API key to connect. Claude will be able to generate release images and videos on your behalf.</p>
+    <h1>Connect to brag.fast</h1>
+    <p>Enter your brag.fast API key to connect. Your AI assistant will be able to generate release images and videos on your behalf.</p>
     ${errorHtml}
     <form method="POST" action="/oauth/submit">
       <input type="hidden" name="client_id" value="${escapeHtml(clientId)}" />
