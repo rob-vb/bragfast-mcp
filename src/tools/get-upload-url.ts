@@ -22,7 +22,7 @@ export interface PresignedUploadResult {
 export async function getUploadUrl(
   client: BragfastApiClient,
   input: GetUploadUrlInput
-): Promise<PresignedUploadResult & { curl_command: string }> {
+): Promise<PresignedUploadResult & { upload_commands: { curl: string; python: string } }> {
   const ext = input.filename.slice(input.filename.lastIndexOf(".")).toLowerCase();
   const contentType = MIME_TYPES[ext];
   if (!contentType) {
@@ -37,6 +37,7 @@ export async function getUploadUrl(
   });
 
   const curlCommand = `curl -X PUT -H 'Content-Type: ${contentType}' -T '${input.filename}' '${result.upload_url}'`;
+  const pythonCommand = `python3 -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('${result.upload_url}', data=open('${input.filename}', 'rb').read(), method='PUT', headers={'Content-Type': '${contentType}'}))"`;
 
-  return { ...result, curl_command: curlCommand };
+  return { ...result, upload_commands: { curl: curlCommand, python: pythonCommand } };
 }
