@@ -57,6 +57,7 @@ app.use(
   mcpAuthRouter({
     provider,
     issuerUrl: new URL(BASE_URL),
+    resourceServerUrl: new URL(`${BASE_URL}/mcp`),
     serviceDocumentationUrl: new URL("https://brag.fast/docs/mcp"),
     resourceName: "brag.fast MCP Server",
   })
@@ -96,16 +97,6 @@ const CORS_HEADERS = {
 
 app.options("/mcp", (_req: Request, res: Response) => {
   res.set(CORS_HEADERS).status(204).end();
-});
-
-// OAuth protected resource metadata — tells clients where to authenticate
-app.get("/.well-known/oauth-protected-resource", (_req: Request, res: Response) => {
-  res.json({
-    resource: `${BASE_URL}/mcp`,
-    authorization_servers: [BASE_URL],
-    bearer_methods_supported: ["header"],
-    scopes_supported: ["mcp"],
-  });
 });
 
 // Auth middleware for /mcp — verifies Bearer token (OAuth or direct API key)
