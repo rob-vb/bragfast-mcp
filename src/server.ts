@@ -9,16 +9,74 @@ import { checkAccount } from "./tools/check-account.js";
 import { getRenderStatus, buildRenderStatusContent } from "./tools/render-status.js";
 import { uploadImage } from "./tools/upload-image.js";
 import { getUploadUrl } from "./tools/get-upload-url.js";
+import { startCook } from "./tools/start-cook.js";
 
 export function createBragfastServer({
   apiClient,
 }: {
   apiClient: BragfastApiClient;
 }): McpServer {
-  const server = new McpServer({
-    name: "bragfast",
-    version: "0.1.0",
-  });
+  const server = new McpServer(
+    {
+      name: "bragfast",
+      version: "0.1.0",
+    },
+    {
+      instructions: [
+        "brag.fast — branded release image and video generator.",
+        "",
+        'WORKFLOW: When a user asks to generate, announce a release, or "use bragfast", you MUST call bragfast_start_cook first. It walks through a 7-step wizard (output type → template → brand/colors → visual → title + description → formats → [video preset]). Call it with {} to begin; after each user answer, call it again with collected updated. Do NOT call bragfast_generate_release_images or bragfast_generate_release_video until bragfast_start_cook returns step "ready".',
+        "",
+        'If the user provides partial info up-front (e.g. "landscape format only"), pre-fill those fields in collected — still walk the remaining questions.',
+      ].join("\n"),
+    }
+  );
+
+  // 0. bragfast_start_cook — guided wizard entry point
+  server.registerTool(
+    "bragfast_start_cook",
+    {
+      title: "Start Cook Wizard",
+      description:
+        "START HERE when a user asks to generate release images or video with bragfast. Returns the next question in the step-by-step wizard (Recipe → Seasoning → Ingredients → Plating, mirroring the brag.fast Cook page). Call with {} to begin. After each user answer, call again with `collected` updated. When step is `ready`, all info is gathered — proceed to call bragfast_get_template then the appropriate generate tool.",
+      inputSchema: z.object({
+        collected: z
+          .object({
+            output_type: z.enum(["images", "video", "both"]).optional(),
+            template: z.string().optional(),
+            brand_id: z.string().optional(),
+            colors: z
+              .object({
+                background: z.string(),
+                text: z.string(),
+                primary: z.string(),
+              })
+              .optional(),
+            visual_url: z.string().optional(),
+            title: z.string().optional(),
+            description: z.string().optional(),
+            formats: z
+              .array(z.enum(["landscape", "square", "portrait"]))
+              .optional(),
+            video_preset: z
+              .enum(["showcase", "3d-tilt-angles", "simple-fade"])
+              .optional(),
+          })
+          .optional()
+          .describe(
+            "Answers collected so far. Omit or pass {} to start fresh; update between calls as the user answers questions."
+          ),
+      }),
+    },
+    async (input) => {
+      const result = startCook(input.collected ?? {});
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(result, null, 2) },
+        ],
+      };
+    }
+  );
 
   // 1. bragfast_generate_release_images
   server.registerTool(
@@ -26,7 +84,15 @@ export function createBragfastServer({
     {
       title: "Generate Release Images",
       description:
-        "Generate branded release announcement images. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion.",
+        "STOP — pre-flight checklist required before calling this tool.\n\n" +
+        "You MUST have already collected ALL of the following via bragfast_start_cook (or by asking the user directly):\n" +
+        "  1. Template — call bragfast_list_templates, show options, confirm choice\n" +
+        "  2. Brand or colors — call bragfast_list_brands; if none, ask for bg/text/primary hex\n" +
+        "  3. Visual — screenshot URL or 'none'\n" +
+        "  4. Title + description — short punchy copy per slide\n" +
+        "  5. Formats — one or more of: landscape, square, portrait\n\n" +
+        "If any item is unknown, do NOT call this tool. Call bragfast_start_cook with what you have so far to get the next question.\n\n" +
+        "When ready: builds branded static release images. Returns a cook_id — poll with bragfast_get_render_status.",
       inputSchema: z.object({
         brand_id: z.string().optional().describe("Brand ID to use for styling"),
         colors: z
@@ -105,12 +171,16 @@ export function createBragfastServer({
     {
       title: "Generate Release Video",
       description:
-        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Supports landscape/square/portrait.\n\n" +
-        "3 animation presets — always ask the user to pick one before generating:\n" +
-        "- **showcase**: cinematic rise + reveal\n" +
-        "- **3d-tilt-angles**: perspective tilt\n" +
-        "- **simple-fade**: clean fade-in\n\n" +
-        "Each object may include video_url (must be a publicly accessible URL) to play a clip in place of image_url. For local MP4 files or files at a public URL, call bragfast_get_upload_url with file_path or source_url — the MCP server returns the hosted URL to use as video_url.",
+        "STOP — pre-flight checklist required before calling this tool.\n\n" +
+        "You MUST have already collected ALL of the following via bragfast_start_cook (or by asking the user directly):\n" +
+        "  1. Template — call bragfast_list_templates, show options, confirm choice\n" +
+        "  2. Brand or colors — call bragfast_list_brands; if none, ask for bg/text/primary hex\n" +
+        "  3. Visual — screenshot or video clip URL, or 'none'\n" +
+        "  4. Title + description — short punchy copy per slide\n" +
+        "  5. Formats — one or more of: landscape, square, portrait\n" +
+        "  6. Animation preset — showcase (cinematic rise + reveal), 3d-tilt-angles (perspective tilt), or simple-fade (clean fade-in). ALWAYS ask, never default silently.\n\n" +
+        "If any item is unknown, do NOT call this tool. Call bragfast_start_cook with what you have so far to get the next question.\n\n" +
+        "When ready: builds an animated branded release video. Each object may include video_url (public MP4/WebM/MOV) to play a clip in place of image_url. For local MP4 files or files at a public URL, call bragfast_get_upload_url with file_path or source_url — the MCP server returns the hosted URL to use as video_url. Returns a cook_id — poll with bragfast_get_render_status.",
       inputSchema: z.object({
         brand_id: z.string().optional(),
         colors: z
@@ -439,7 +509,9 @@ export function createBragfastServer({
           role: "user" as const,
           content: {
             type: "text" as const,
-            text: `Help me create release announcement content using the bragfast MCP tools. Follow this workflow step by step:
+            text: `Help me create release announcement content using the bragfast MCP tools. Follow this workflow step by step.
+
+If you have not yet called \`bragfast_start_cook\`, call it now with \`{}\` before anything else — it returns the next wizard question and keeps you aligned with the steps below.
 
 ## Step 1: Gather Content
 
