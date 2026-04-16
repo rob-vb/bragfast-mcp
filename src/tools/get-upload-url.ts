@@ -1,4 +1,5 @@
 import { readFile } from "fs/promises";
+import { basename } from "path";
 import { BragfastApiClient } from "../lib/api-client.js";
 
 const MIME_TYPES: Record<string, string> = {
@@ -60,6 +61,7 @@ export async function getUploadUrl(
 ): Promise<
   | (PresignedUploadResult & { upload_commands: { curl: string; python: string } })
   | UploadResult
+  | { url: string }
 > {
   const contentType = getContentType(input.filename);
 
@@ -86,19 +88,43 @@ export async function getUploadUrl(
       buffer = Buffer.from(await res.arrayBuffer());
     }
 
-    // PUT directly to the presigned R2 URL from the MCP server process.
-    const putRes = await fetch(presigned.upload_url, {
-      method: "PUT",
-      headers: { "Content-Type": contentType },
-      body: new Uint8Array(buffer),
-    });
-    if (!putRes.ok) {
+    // Attempt 1: PUT directly to the presigned R2 URL from the MCP server
+    // process (fast, no size limit). May be blocked by network allowlist in
+    // some hosted/sandboxed environments.
+    let putBlocked = false;
+    try {
+      const putRes = await fetch(presigned.upload_url, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: new Uint8Array(buffer),
+      });
+      if (putRes.ok) {
+        const result = await client.get<UploadResult>(`/upload/${presigned.upload_id}`);
+        return result;
+      }
+      // Non-2xx but reachable — real error, don't fall back.
       throw new Error(`Presigned upload failed: HTTP ${putRes.status}`);
+    } catch (err) {
+      // fetch() throws TypeError on network-level failures (connection refused,
+      // allowlist denial, DNS failure). Non-TypeError = real HTTP error, re-throw.
+      if (err instanceof TypeError) {
+        putBlocked = true;
+      } else {
+        throw err;
+      }
     }
 
-    // Resolve the hosted URL via the API.
-    const result = await client.get<UploadResult>(`/upload/${presigned.upload_id}`);
-    return result;
+    if (putBlocked) {
+      // Attempt 2: multipart POST through the brag.fast API (always reachable).
+      // Subject to the server's body size limit — works for images and smaller
+      // videos. For very large files this may also fail; raise /upload limit
+      // server-side to fix.
+      const name = input.file_path ? basename(input.file_path) : input.filename;
+      const blob = new Blob([new Uint8Array(buffer)], { type: contentType });
+      const formData = new FormData();
+      formData.set("file", blob, name);
+      return client.postMultipart<{ url: string }>("/upload", formData);
+    }
   }
 
   // Fallback: return presigned URL + commands for manual execution.
