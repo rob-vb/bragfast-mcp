@@ -56,7 +56,7 @@ export interface ReleaseResult {
   output: "image" | "video";
   status: "pending" | "pending_review" | "completed" | "failed" | "dismissed";
   images: Record<string, { slides: string[]; dimensions: string }> | null;
-  videos?: Record<string, { url: string; duration: number; dimensions: string }> | null;
+  videos?: Record<string, { url: string; duration: number; dimensions: string; poster_url?: string }> | null;
   credits_used: number;
   credits_remaining: number;
   created_at: string;

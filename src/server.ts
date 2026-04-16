@@ -6,10 +6,9 @@ import { generateVideo } from "./tools/generate-video.js";
 import { listBrands } from "./tools/list-brands.js";
 import { listTemplates, getTemplate } from "./tools/list-templates.js";
 import { checkAccount } from "./tools/check-account.js";
-import { getRenderStatus } from "./tools/render-status.js";
+import { getRenderStatus, buildRenderStatusContent } from "./tools/render-status.js";
 import { uploadImage } from "./tools/upload-image.js";
 import { getUploadUrl } from "./tools/get-upload-url.js";
-import { fetchImageAsBase64 } from "./lib/fetch-image.js";
 
 export function createBragfastServer({
   apiClient,
@@ -310,42 +309,7 @@ export function createBragfastServer({
     async (input) => {
       try {
         const result = await getRenderStatus(apiClient, input);
-        const content: Array<
-          | { type: "text"; text: string }
-          | { type: "image"; data: string; mimeType: string; annotations?: { audience: ("user" | "assistant")[] } }
-          | { type: "resource_link"; uri: string; name: string; mimeType: string; description?: string; annotations?: { audience: ("user" | "assistant")[] } }
-        > = [{ type: "text" as const, text: JSON.stringify(result, null, 2) }];
-
-        if (result.status === "completed" && result.images) {
-          const urls = Object.values(result.images).flatMap((f) => f.slides);
-          const fetches = await Promise.allSettled(
-            urls.map((url) => fetchImageAsBase64(url))
-          );
-          for (const settled of fetches) {
-            if (settled.status === "fulfilled" && settled.value) {
-              content.push({
-                type: "image" as const,
-                data: settled.value.data,
-                mimeType: settled.value.mimeType,
-                annotations: { audience: ["user"] },
-              });
-            }
-          }
-        }
-
-        if (result.status === "completed" && result.videos) {
-          for (const [format, video] of Object.entries(result.videos)) {
-            content.push({
-              type: "resource_link" as const,
-              uri: video.url,
-              name: `${format}.mp4`,
-              mimeType: "video/mp4",
-              description: `${video.dimensions} · ${video.duration}s`,
-              annotations: { audience: ["user"] },
-            });
-          }
-        }
-
+        const content = await buildRenderStatusContent(result);
         return { content };
       } catch (err) {
         return {
