@@ -45,18 +45,17 @@ export async function uploadImage(
     image_base64?: string;
     filename?: string;
   }
-): Promise<{ url: string }> {
+): Promise<{ url: string } | import("./get-upload-url.js").TokenUploadResult> {
+  // Claude sandbox path (/mnt/user-data/): MCP server cannot read these.
+  // Delegate to token flow — return curl instructions so the sandbox uploads directly.
+  if (input.file_path?.startsWith("/mnt/user-data/")) {
+    const filename = input.filename ?? basename(input.file_path);
+    return getUploadUrl(client, { filename }) as Promise<import("./get-upload-url.js").TokenUploadResult>;
+  }
+
   // For file_path and source_url, use the presigned R2 upload flow so large
   // files (big images, videos) don't hit the multipart body size limit.
   if (input.file_path || input.source_url) {
-    if (input.file_path?.startsWith("/mnt/user-data/")) {
-      throw new Error(
-        `file_path "${input.file_path}" is a Claude sandbox path — the MCP server cannot access it. ` +
-        `Ask the user to provide one of: (1) the real filesystem path to the file ` +
-        `(e.g. /Users/name/Desktop/hero.jpg or C:\\Users\\name\\Desktop\\hero.jpg), or ` +
-        `(2) a public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw) — use that as source_url.`
-      );
-    }
     const filename = input.file_path
       ? basename(input.file_path)
       : (input.filename ?? guessFilename(input.source_url!));
