@@ -167,6 +167,9 @@ export async function getUploadUrl(
   const instructions = `curl -X POST -F 'file=@<local_file_path>' '${mint.upload_url}'`;
   const hint =
     "Replace <local_file_path> with the actual path to the file (e.g. /mnt/user-data/uploads/hero.png). " +
+    "If curl fails with a DNS error (e.g. 'DNS cache overflow', 'Could not resolve host'), " +
+    "use your Read tool to read the file as base64, then call bragfast_upload_image with " +
+    "file_base64=<base64_content> and filename=<original_filename> instead of using curl. " +
     "If curl fails with 'host_not_allowed' or 403, ask the user to add 'brag.fast' to " +
     "Settings → Capabilities → Network Egress → Additional allowed domains.";
 
