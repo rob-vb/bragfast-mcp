@@ -370,10 +370,10 @@ export function createBragfastServer({
       title: "Get Render Status",
       description:
         "Check the status of a render job. Returns status, and image/video URLs when complete. When images are ready, the tool response includes a markdown snippet — you MUST copy that exact `![name](url)` markdown into your reply so the image renders inline in the chat (not hidden behind the tool-result card). Videos are returned as resource links (mimeType `video/mp4`) for the client to render or download.\n\n" +
-        "Polling strategy (saves tool calls):\n" +
-        "- Images: first call after 30s with wait_seconds=0 (quick %), then wait_seconds=55 if still rendering.\n" +
-        "- Video: first call after 60s with wait_seconds=0 (quick %), then wait_seconds=55 if still rendering. Most videos finish within the second call.\n" +
-        "- If still not done after the long wait, call again with wait_seconds=55 (max 2 extra retries).",
+        "Polling strategy — use the `wait_seconds` parameter to long-poll server-side. NEVER use a shell `sleep` or `Bash` timer to wait between polls; the `wait_seconds` value IS the wait.\n" +
+        "- Images: first call with wait_seconds=10 (usually done). If still rendering, call again with wait_seconds=55.\n" +
+        "- Video: first call with wait_seconds=55. If still rendering, call again with wait_seconds=55. Most videos finish within the second call.\n" +
+        "- If still not done, call again with wait_seconds=55 (max 2 extra retries).",
       inputSchema: z.object({
         cook_id: z
           .string()
@@ -568,10 +568,9 @@ Show your reasoning and let me confirm or change the choice.
 
 **Important:** The \`formats\` parameter must be a JSON array of objects, not a string.
 
-**Polling rules — use wait_seconds to long-poll and save tool calls:**
-- Images: wait 30s, call \`bragfast_get_render_status\` with \`wait_seconds: 0\` (quick progress check). If still rendering, call again with \`wait_seconds: 55\`. Max 2 extra retries after that.
-- Video: wait 60s, call with \`wait_seconds: 0\` (show user the % progress). If still rendering, call again with \`wait_seconds: 55\` — most videos finish in this window. Max 2 extra retries after that.
-- Never poll faster than every 30s with \`wait_seconds: 0\`.
+**Polling rules — use the \`wait_seconds\` parameter to long-poll server-side. NEVER use a shell \`sleep\` / \`Bash\` timer to wait between polls; \`wait_seconds\` IS the wait.**
+- Images: call \`bragfast_get_render_status\` with \`wait_seconds: 10\` (images usually finish fast). If still rendering, call again with \`wait_seconds: 55\`. Max 2 extra retries after that.
+- Video: call with \`wait_seconds: 55\`. If still rendering, call again with \`wait_seconds: 55\` — most videos finish in this window. Max 2 extra retries after that.
 
 After results: show the image/video URLs, report credits used and remaining, and offer to generate in other formats or as video/images if I only did one.
 
