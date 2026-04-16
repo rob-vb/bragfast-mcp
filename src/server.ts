@@ -106,7 +106,7 @@ export function createBragfastServer({
     {
       title: "Generate Release Video",
       description:
-        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Supports landscape/square/portrait. Each object may include video_url (MP4/WebM/MOV) to play a clip in place of image_url.",
+        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Supports landscape/square/portrait. Each object may include video_url (must be a publicly accessible URL) to play a clip in place of image_url. For local MP4 files, call bragfast_get_upload_url first to get a presigned upload URL, upload the file via curl/python, then pass the hosted URL as video_url.",
       inputSchema: z.object({
         brand_id: z.string().optional(),
         colors: z
@@ -159,9 +159,11 @@ export function createBragfastServer({
                 .optional()
                 .describe("Per-slide duration in seconds (3-30, default 8, max 60 total)"),
               preset: z
-                .literal("showcase")
+                .enum(["showcase", "3d-tilt-angles", "simple-fade"])
                 .optional()
-                .describe("Cinematic rise + reveal animation preset"),
+                .describe(
+                  "Animation preset. showcase = cinematic rise + reveal; 3d-tilt-angles = perspective tilt; simple-fade = clean fade-in. ALWAYS ask the user which preset to use before generating — do not default silently."
+                ),
             }),
           ])
           .optional()
@@ -339,18 +341,18 @@ export function createBragfastServer({
   server.registerTool(
     "bragfast_upload_image",
     {
-      title: "Upload Image",
+      title: "Upload Image or Video",
       description:
-        "ONLY for tiny images under 50KB (small logos, icons) via base64, or local files via file_path. DO NOT use for screenshots, photos, or user-attached images — use bragfast_get_upload_url instead. If you already have a public URL, skip upload entirely and use it as image_url in the slide.",
+        "ONLY for tiny images under 50KB (small logos, icons) via base64, or local files via file_path. Supports images (PNG/JPG/WebP/SVG) and videos (MP4/WebM/MOV). DO NOT use for screenshots, photos, or user-attached images — use bragfast_get_upload_url instead. If you already have a public URL, skip upload entirely and use it as image_url or video_url in the slide.",
       inputSchema: z.object({
         file_path: z
           .string()
           .optional()
-          .describe("Absolute path to a local image file"),
+          .describe("Absolute path to a local image or video file"),
         image_base64: z
           .string()
           .optional()
-          .describe("Base64-encoded image file content"),
+          .describe("Base64-encoded image file content (images only)"),
         filename: z
           .string()
           .optional()
@@ -378,12 +380,12 @@ export function createBragfastServer({
     {
       title: "Get Upload URL",
       description:
-        "Upload an image to Bragfast. This is the DEFAULT upload method — use this for all images including screenshots, photos, and user-attached files. Returns a presigned URL with both curl and python upload commands. Try curl first; if blocked by proxy, use the python command instead. After uploading, use the upload_id to get the hosted URL. DO NOT base64-encode images — use this tool instead.",
+        "Upload an image or video to Bragfast. This is the DEFAULT upload method — use this for all images (PNG/JPG/WebP/SVG) and videos (MP4/WebM/MOV up to 50MB). Returns a presigned URL with both curl and python upload commands. Try curl first; if blocked by proxy, use the python command instead. After uploading, use the upload_id to get the hosted URL. DO NOT base64-encode files — use this tool instead. For video slides, upload the MP4 here and pass the returned URL as video_url on the slide object.",
       inputSchema: z.object({
         filename: z
           .string()
           .describe(
-            "Filename with extension (e.g. screenshot.png, photo.jpg)"
+            "Filename with extension (e.g. screenshot.png, photo.jpg, demo.mp4)"
           ),
       }),
     },
@@ -438,9 +440,9 @@ You can edit, remove, or add slides — or say "looks good" to continue.
 \`\`\`
 
 After I approve, ask me:
-1. **Output type:** Images (static), Video (animated), or Both?
+1. **Output type:** Images (static), Video (animated), or Both? If video, ask which animation preset: Showcase (cinematic rise + reveal), 3D Tilt Angles (perspective tilt), or Simple Fade (clean fade-in).
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
-3. **Screenshots:** Do I have screenshots to include? If so, I can provide a public URL (pass directly as \`image_url\` in the slide) or attach the image in chat. For attached images or local files, use \`bragfast_get_upload_url\` to get a presigned upload URL, then run the curl command to upload directly — this avoids passing large base64 through the context window. For small images like logos, \`bragfast_upload_image\` with base64 also works.
+3. **Screenshots/videos:** Do I have screenshots or video clips to include? If so, I can provide a public URL (pass directly as \`image_url\` or \`video_url\` in the slide) or attach the file in chat. For attached files or local paths (images or MP4/WebM/MOV up to 50MB), use \`bragfast_get_upload_url\` to get a presigned upload URL, then run the curl command to upload directly — this avoids passing large base64 through the context window. For small images like logos, \`bragfast_upload_image\` with base64 also works.
 
 ## Step 2: Brand & Template Setup
 

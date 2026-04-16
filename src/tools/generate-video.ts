@@ -3,7 +3,7 @@ import type { ReleaseResult } from "../lib/types.js";
 import type { GenerateImagesInput } from "./generate-images.js";
 
 export interface GenerateVideoInput extends GenerateImagesInput {
-  video?: { duration?: number; preset?: "showcase" } | true;
+  video?: { duration?: number; preset?: "showcase" | "3d-tilt-angles" | "simple-fade" } | true;
 }
 
 export async function generateVideo(
