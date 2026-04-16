@@ -67,19 +67,18 @@ describe("generateVideo", () => {
     expect(body.video).toBe(true);
   });
 
-  it("rejects og format with an error", async () => {
+  it("supports showcase preset", async () => {
     const client = makeClient();
+    vi.mocked(client.post).mockResolvedValue(baseResult);
 
     const input = {
-      formats: [
-        { name: "landscape" as const, slides: [{}] },
-        { name: "og" as const, slides: [{}] },
-      ],
+      formats: [{ name: "landscape" as const, slides: [{}] }],
+      video: { preset: "showcase" as const, duration: 6 },
     };
 
-    await expect(generateVideo(client, input)).rejects.toThrow(
-      'Video does not support "og" format. Use landscape, square, or portrait.'
-    );
-    expect(client.post).not.toHaveBeenCalled();
+    await generateVideo(client, input);
+
+    const [, body] = vi.mocked(client.post).mock.calls[0] as [string, { video: unknown }];
+    expect(body.video).toEqual({ preset: "showcase", duration: 6 });
   });
 });

@@ -9,17 +9,20 @@ export interface GenerateImagesInput {
   font_family?: string;
   template?: string;
   formats: Array<{
-    name: "landscape" | "square" | "portrait" | "og";
+    name: "landscape" | "square" | "portrait";
     slides: Array<{
       objects?: Array<{
         id: string;
         text?: string;
         image_url?: string;
+        video_url?: string;
         font_family?: string;
         font_weight?: number;
         color?: string;
-        image_frame?: "browser" | "mobile" | "none";
-        image_frame_color?: string;
+        visual_frame?: "browser" | "mobile" | "none";
+        visual_frame_color?: string;
+        anchor_x?: "left" | "center" | "right";
+        anchor_y?: "top" | "center" | "bottom";
       }>;
     }>;
   }>;

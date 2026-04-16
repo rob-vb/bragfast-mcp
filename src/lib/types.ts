@@ -24,15 +24,15 @@ export interface ObjectModification {
   font_weight?: number;
   color?: string;
   image_url?: string;
-  image_frame?: "browser" | "mobile" | "none";
-  image_frame_color?: string;
+  video_url?: string;
+  visual_frame?: "browser" | "mobile" | "none";
+  visual_frame_color?: string;
   anchor_x?: "left" | "center" | "right";
   anchor_y?: "top" | "center" | "bottom";
-  entrance?: "fade-in" | "slide-up" | "bounce" | "none";
 }
 
 export interface FormatEntry {
-  name: "landscape" | "square" | "portrait" | "og";
+  name: "landscape" | "square" | "portrait";
   slides: Array<{
     objects?: ObjectModification[];
   }>;
@@ -46,7 +46,7 @@ export interface ReleaseRequest {
   font_family?: string;
   template?: string;
   formats: FormatEntry[];
-  video?: true | { duration?: number };
+  video?: true | { duration?: number; preset?: "showcase" };
   metadata?: string;
   webhook_url?: string;
 }

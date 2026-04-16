@@ -51,7 +51,7 @@ export function createBragfastServer({
           .array(
             z.object({
               name: z
-                .enum(["landscape", "square", "portrait", "og"])
+                .enum(["landscape", "square", "portrait"])
                 .describe("Output format"),
               slides: z.array(
                 z.object({
@@ -64,10 +64,12 @@ export function createBragfastServer({
                         font_family: z.string().optional(),
                         font_weight: z.number().optional(),
                         color: z.string().optional(),
-                        image_frame: z
+                        visual_frame: z
                           .enum(["browser", "mobile", "none"])
                           .optional(),
-                        image_frame_color: z.string().optional(),
+                        visual_frame_color: z.string().optional(),
+                        anchor_x: z.enum(["left", "center", "right"]).optional(),
+                        anchor_y: z.enum(["top", "center", "bottom"]).optional(),
                       })
                     )
                     .optional(),
@@ -104,7 +106,7 @@ export function createBragfastServer({
     {
       title: "Generate Release Video",
       description:
-        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Does not support 'og' format.",
+        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Supports landscape/square/portrait. Each object may include video_url (MP4/WebM/MOV) to play a clip in place of image_url.",
       inputSchema: z.object({
         brand_id: z.string().optional(),
         colors: z
@@ -124,14 +126,23 @@ export function createBragfastServer({
                     z.object({
                       id: z.string(),
                       text: z.string().optional(),
-                      image_url: z.string().optional(),
+                      image_url: z
+                        .string()
+                        .optional()
+                        .describe("Fallback image when video_url is not set"),
+                      video_url: z
+                        .string()
+                        .optional()
+                        .describe("MP4/WebM/MOV clip to play in place of image_url"),
                       font_family: z.string().optional(),
                       font_weight: z.number().optional(),
                       color: z.string().optional(),
-                      image_frame: z
+                      visual_frame: z
                         .enum(["browser", "mobile", "none"])
                         .optional(),
-                      image_frame_color: z.string().optional(),
+                      visual_frame_color: z.string().optional(),
+                      anchor_x: z.enum(["left", "center", "right"]).optional(),
+                      anchor_y: z.enum(["top", "center", "bottom"]).optional(),
                     })
                   )
                   .optional(),
@@ -140,7 +151,19 @@ export function createBragfastServer({
           })
         ),
         video: z
-          .union([z.literal(true), z.object({ duration: z.number().optional() })])
+          .union([
+            z.literal(true),
+            z.object({
+              duration: z
+                .number()
+                .optional()
+                .describe("Per-slide duration in seconds (3-30, default 8, max 60 total)"),
+              preset: z
+                .literal("showcase")
+                .optional()
+                .describe("Cinematic rise + reveal animation preset"),
+            }),
+          ])
           .optional()
           .describe("Video options. Defaults to true."),
         metadata: z.string().optional(),
