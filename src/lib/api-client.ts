@@ -36,6 +36,10 @@ export class BragfastApiClient {
     this.baseUrl = baseUrl ?? process.env.BRAGFAST_API_URL ?? DEFAULT_BASE_URL;
   }
 
+  get apiBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   static withToken(apiKey: string, baseUrl?: string): BragfastApiClient {
     const client = new BragfastApiClient(baseUrl);
     client.directToken = apiKey;
@@ -73,6 +77,40 @@ export class BragfastApiClient {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error("Cannot reach Bragfast API. Check your internet connection.");
+    }
+    return handleResponse<T>(res);
+  }
+
+  async putRaw<T>(path: string, body: Uint8Array, contentType: string): Promise<T> {
+    const apiKey = await this.resolveKey();
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": contentType,
+          // No Authorization header — chunked part PUTs are HMAC-signed via query params
+        },
+        body: body as unknown as BodyInit,
+      });
+    } catch {
+      throw new Error("Cannot reach Bragfast API. Check your internet connection.");
+    }
+    return handleResponse<T>(res);
+  }
+
+  async postRaw<T>(path: string): Promise<T> {
+    const apiKey = await this.resolveKey();
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
       });
     } catch {
       throw new Error("Cannot reach Bragfast API. Check your internet connection.");
