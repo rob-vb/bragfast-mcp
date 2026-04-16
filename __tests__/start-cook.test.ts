@@ -144,6 +144,67 @@ describe("startCook", () => {
     expect(result.step).toBe("template");
   });
 
+  it("emits AskUserQuestion payload on output_type step", () => {
+    const result = startCook({});
+    expect(result.ask_user_question).toBeDefined();
+    expect(result.ask_user_question?.header).toBe("Output");
+    expect(result.ask_user_question?.multiSelect).toBe(false);
+    expect(result.ask_user_question?.options).toHaveLength(3);
+  });
+
+  it("emits multi-select AskUserQuestion payload on formats step", () => {
+    const result = startCook({
+      output_type: "images",
+      template: "hero",
+      brand_id: "brand_123",
+      visual_url: "none",
+      title: "Shipped",
+      description: "New release is out.",
+    });
+    expect(result.step).toBe("formats");
+    expect(result.ask_user_question?.multiSelect).toBe(true);
+    expect(result.ask_user_question?.header).toBe("Formats");
+  });
+
+  it("emits AskUserQuestion payload on video_preset step", () => {
+    const result = startCook({
+      output_type: "video",
+      template: "hero",
+      brand_id: "brand_123",
+      visual_url: "https://example.com/clip.mp4",
+      title: "Shipped",
+      description: "New release is out.",
+      formats: ["landscape"],
+    });
+    expect(result.step).toBe("video_preset");
+    expect(result.ask_user_question?.header).toBe("Motion");
+    expect(result.ask_user_question?.multiSelect).toBe(false);
+    expect(result.ask_user_question?.options).toHaveLength(3);
+  });
+
+  it("does not emit AskUserQuestion payload on free-form steps", () => {
+    const template = startCook({ output_type: "images" });
+    expect(template.step).toBe("template");
+    expect(template.ask_user_question).toBeUndefined();
+
+    const visual = startCook({
+      output_type: "images",
+      template: "hero",
+      brand_id: "brand_123",
+    });
+    expect(visual.step).toBe("visual");
+    expect(visual.ask_user_question).toBeUndefined();
+
+    const content = startCook({
+      output_type: "images",
+      template: "hero",
+      brand_id: "brand_123",
+      visual_url: "none",
+    });
+    expect(content.step).toBe("content");
+    expect(content.ask_user_question).toBeUndefined();
+  });
+
   it("treats empty formats array the same as missing formats", () => {
     const result = startCook({
       output_type: "images",

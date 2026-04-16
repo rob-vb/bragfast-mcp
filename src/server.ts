@@ -28,6 +28,8 @@ export function createBragfastServer({
         'WORKFLOW: When a user asks to generate, announce a release, or "use bragfast", you MUST call bragfast_start_cook first. It walks through a 7-step wizard (output type → template → brand/colors → visual → title + description → formats → [video preset]). Call it with {} to begin; after each user answer, call it again with collected updated. Do NOT call bragfast_generate_release_images or bragfast_generate_release_video until bragfast_start_cook returns step "ready".',
         "",
         'If the user provides partial info up-front (e.g. "landscape format only"), pre-fill those fields in collected — still walk the remaining questions.',
+        "",
+        "RENDERING CHOICES: When bragfast_start_cook returns an `ask_user_question` payload, present it to the user by calling the AskUserQuestion tool (available in Claude Code and similar clients) with that exact payload — do not paste the options as plain text. If AskUserQuestion isn't available in the current client, fall back to plain-text choices.",
       ].join("\n"),
     }
   );
