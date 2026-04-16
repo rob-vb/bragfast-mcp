@@ -106,7 +106,12 @@ export function createBragfastServer({
     {
       title: "Generate Release Video",
       description:
-        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Supports landscape/square/portrait. Each object may include video_url (must be a publicly accessible URL) to play a clip in place of image_url. For local MP4 files or files at a public URL, call bragfast_get_upload_url with file_path or source_url — the MCP server uploads directly to R2 and returns the hosted URL to use as video_url.",
+        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Supports landscape/square/portrait.\n\n" +
+        "3 animation presets — always ask the user to pick one before generating:\n" +
+        "- **showcase**: cinematic rise + reveal\n" +
+        "- **3d-tilt-angles**: perspective tilt\n" +
+        "- **simple-fade**: clean fade-in\n\n" +
+        "Each object may include video_url (must be a publicly accessible URL) to play a clip in place of image_url. For local MP4 files or files at a public URL, call bragfast_get_upload_url with file_path or source_url — the MCP server uploads directly to R2 and returns the hosted URL to use as video_url.",
       inputSchema: z.object({
         brand_id: z.string().optional(),
         colors: z
@@ -359,9 +364,10 @@ export function createBragfastServer({
       description:
         "Upload an image or video to Bragfast and get a hosted URL. Supports PNG/JPG/WebP/SVG and MP4/WebM/MOV up to 50MB.\n\n" +
         "The MCP server handles the upload entirely — do NOT attempt to curl or PUT to any URL yourself.\n\n" +
+        "⚠️ **Attachments don't work.** Files attached to the conversation in claude.ai are not accessible to this MCP server — never use /mnt/user-data/ paths or try to re-encode an attachment as base64. Instead, always ask the user for a file path or public URL.\n\n" +
         "Input modes:\n" +
-        "- **file_path**: Absolute local path — **Claude Code CLI only**. Not available in claude.ai.\n" +
-        "- **source_url**: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). Works everywhere including claude.ai. Best option for large files in claude.ai.\n" +
+        "- **file_path**: Absolute local path — **Claude Code CLI only**. If the user attached a file, ask for the real filesystem path instead (e.g. /Users/name/Desktop/hero.jpg).\n" +
+        "- **source_url**: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). Works everywhere including claude.ai. Best option when file_path isn't available.\n" +
         "- **file_base64 / image_base64 + filename**: Base64 content — **small files only (<4MB)**. Do NOT use for videos or large images — it bloats the context window and will crash the session.\n\n" +
         "⚠️ In claude.ai with a large local file: ask the user to upload to Dropbox/Google Drive/WeTransfer and provide a direct download link. Use that as source_url.\n\n" +
         "If you already have a public URL, skip upload and use it directly as image_url or video_url on the slide.",
@@ -369,7 +375,7 @@ export function createBragfastServer({
         file_path: z
           .string()
           .optional()
-          .describe("Absolute path to a local image or video file (Claude Code CLI only)"),
+          .describe("Absolute path to a local image or video file (Claude Code CLI only). NEVER use /mnt/user-data/ paths — those are Claude's internal sandbox, inaccessible to the MCP server. If the user attached a file in the conversation, ask for the real filesystem path or a public URL instead."),
         source_url: z
           .string()
           .optional()
@@ -413,8 +419,9 @@ export function createBragfastServer({
       description:
         "Upload a video or large image to Bragfast (up to 50MB). Returns a hosted URL to use as video_url or image_url.\n\n" +
         "The MCP server handles the upload entirely — do NOT attempt to curl, PUT, or fetch any upload URL yourself.\n\n" +
+        "⚠️ **Attachments don't work.** Files attached to the conversation in claude.ai are not accessible to this MCP server — never use /mnt/user-data/ paths or base64-encode an attachment. Ask the user for a file path or public URL.\n\n" +
         "**Provide file source:**\n" +
-        "- `file_path`: Absolute local path — **Claude Code CLI only**. Not available in claude.ai.\n" +
+        "- `file_path`: Absolute local path — **Claude Code CLI only**. If user attached a file, ask for the real filesystem path instead.\n" +
         "- `source_url`: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). Works everywhere. **Required for large files in claude.ai.**\n\n" +
         "⚠️ In claude.ai with a large local file: do NOT encode as base64 (kills context). Ask the user to upload to Dropbox/WeTransfer and give you a direct download link.\n\n" +
         "**Omit both** only if you want manual upload commands (not recommended — may be blocked in sandboxed environments).",
@@ -425,7 +432,7 @@ export function createBragfastServer({
         file_path: z
           .string()
           .optional()
-          .describe("Absolute path to a local file. MCP server reads and uploads — no proxy issues."),
+          .describe("Absolute path to a local file (Claude Code CLI only). NEVER use /mnt/user-data/ paths — those are Claude's internal sandbox, not accessible to the MCP server."),
         source_url: z
           .string()
           .optional()
@@ -486,9 +493,10 @@ After I approve, ask me:
 1. **Output type:** Images (static), Video (animated), or Both? If video, ask which animation preset: Showcase (cinematic rise + reveal), 3D Tilt Angles (perspective tilt), or Simple Fade (clean fade-in).
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
 3. **Screenshots/videos:** Do I have screenshots or video clips to include? Options:
+   - **⚠️ Attachments don't work.** Files attached to the conversation are not accessible to the MCP server — never use /mnt/user-data/ paths. Always ask the user for a file path or public URL.
    - **Already have a public URL?** Use it directly as \`image_url\` or \`video_url\` — no upload needed.
-   - **Local file in Claude Code CLI?** Use \`bragfast_upload_image\` with \`file_path\` — tool uploads automatically, do NOT curl anywhere.
-   - **In claude.ai with a large local file?** Cannot upload directly. Ask the user to upload to Dropbox/WeTransfer/Google Drive and share a direct download link, then use \`source_url\`.
+   - **Local file in Claude Code CLI?** Ask the user for the absolute file path (e.g. /Users/name/Desktop/hero.jpg), then use \`bragfast_upload_image\` with \`file_path\` — tool uploads automatically, do NOT curl anywhere.
+   - **In claude.ai with a local file?** Cannot read local files. Ask the user to upload to Dropbox/WeTransfer/Google Drive and share a direct download link, then use \`source_url\`.
    - **File at a public URL (Dropbox, Google Drive, GitHub raw, WeTransfer)?** Use \`bragfast_get_upload_url\` with \`source_url\` — works in claude.ai and Claude Code.
    - **Small image/logo only (<4MB)?** \`bragfast_upload_image\` with \`file_base64\` works. Do NOT use base64 for videos or large files — it will crash the session.
    - **Last resort only:** \`bragfast_get_upload_url\` without file_path/source_url returns a presigned URL + curl/python commands, but these may be blocked in sandboxed environments.

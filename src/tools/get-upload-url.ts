@@ -70,6 +70,14 @@ export async function getUploadUrl(
   if (input.file_path || input.source_url) {
     let buffer: Buffer;
     if (input.file_path) {
+      if (input.file_path.startsWith("/mnt/user-data/")) {
+        throw new Error(
+          `file_path "${input.file_path}" is a Claude sandbox path — the MCP server cannot access it. ` +
+          `Ask the user to provide one of: (1) the real filesystem path to the file ` +
+          `(e.g. /Users/name/Desktop/hero.jpg or C:\\Users\\name\\Desktop\\hero.jpg), or ` +
+          `(2) a public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw) — use that as source_url.`
+        );
+      }
       buffer = await readFile(input.file_path);
     } else {
       let res: Response;
