@@ -363,9 +363,8 @@ export function createBragfastServer({
       title: "Upload Image or Video",
       description:
         "Upload an image or video to Bragfast and get a hosted URL. Supports PNG/JPG/WebP/SVG and MP4/WebM/MOV.\n\n" +
-        "⛔ For claude.ai sandbox files (path starts with `/mnt/user-data/`): do NOT use this tool and do NOT base64-encode the file. Use `bragfast_get_upload_url` with `filename` only — it returns a curl command to upload directly from the sandbox.\n\n" +
-        "Use this tool when:\n" +
-        "- `file_path`: absolute local path on the MCP server host (Claude Code CLI only, never `/mnt/user-data/`)\n" +
+        "Input modes:\n" +
+        "- `file_path`: pass the file path — including `/mnt/user-data/` sandbox paths from claude.ai attachments. The tool auto-detects sandbox paths and returns a curl command + instructions to upload directly from the sandbox (no public URL needed).\n" +
         "- `source_url`: public URL — MCP server fetches and uploads (works in claude.ai)\n" +
         "- `file_base64` / `image_base64` + `filename`: base64 content already in context — small images only (<1MB, never videos)\n\n" +
         "If you already have a public URL, use it directly as image_url / video_url — no upload needed.",
@@ -373,7 +372,7 @@ export function createBragfastServer({
         file_path: z
           .string()
           .optional()
-          .describe("Absolute path to a local image or video file (Claude Code CLI only). NEVER use /mnt/user-data/ paths — those are Claude's internal sandbox, inaccessible to the MCP server. If the user attached a file in the conversation, ask for the real filesystem path or a public URL instead."),
+          .describe("Path to the file. Pass /mnt/user-data/ paths directly — the tool detects sandbox paths and returns curl upload instructions automatically."),
         source_url: z
           .string()
           .optional()
