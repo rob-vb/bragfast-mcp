@@ -35,14 +35,8 @@ export interface UploadResult {
 }
 
 export interface SandboxUploadResult {
-  upload_id: string;
-  upload_url: string;
-  url: string;
-  expires_in: number;
-  max_size_bytes: number;
-  method: "PUT";
-  content_type: string;
   instructions: string;
+  url: string;
   hint: string;
 }
 
@@ -163,18 +157,12 @@ export async function getUploadUrl(
   const instructions = `curl -X PUT -H 'Content-Type: ${contentType}' --upload-file <local_file_path> '${presigned.upload_url}'`;
   const hint =
     "Replace <local_file_path> with the actual path to the file (e.g. /mnt/user-data/uploads/hero.png). " +
-    "After curl succeeds, use the `url` field as image_url or video_url in downstream generate calls — no further upload calls needed. " +
-    "The upload URL is a curl-able R2 presigned URL; requires shell access to execute (e.g. Claude Code, claude.ai sandbox).";
+    "Execute this curl command using the Bash tool directly. " +
+    "After curl succeeds, use the `url` field as image_url or video_url in downstream generate calls — no further upload calls needed.";
 
   return {
-    upload_id: presigned.upload_id,
-    upload_url: presigned.upload_url,
-    url: presigned.public_url,
-    expires_in: presigned.expires_in,
-    max_size_bytes: presigned.max_size_bytes,
-    method: "PUT" as const,
-    content_type: contentType,
     instructions,
+    url: presigned.public_url,
     hint,
   };
 }

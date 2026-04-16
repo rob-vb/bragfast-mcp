@@ -413,9 +413,8 @@ export function createBragfastServer({
     {
       title: "Upload Video or Large Image",
       description:
-        "Returns a curl-able upload URL for local files (up to 50MB). After calling this, use shell/curl to upload — do NOT base64-encode the file.\n\n" +
-        "    curl -X PUT -H 'Content-Type: <content_type>' --upload-file <local_path> <upload_url>\n\n" +
-        "Use the returned `url` field as image_url or video_url in generate calls. Requires shell access to run the curl command, e.g. Claude Code or claude.ai sandbox.\n\n" +
+        "Returns a ready-to-run curl command for uploading local files (up to 50MB). Execute the returned `instructions` field using the Bash tool directly — do NOT base64-encode the file.\n\n" +
+        "Use the returned `url` field as image_url or video_url in generate calls.\n\n" +
         "Two modes:\n" +
         "- `filename` only → returns R2-signed PUT URL for sandbox attachments (path starts with `/mnt/user-data/`). Sandbox runs the curl.\n" +
         "- `source_url` → MCP server fetches from a public URL and uploads server-side; returns `{ url }` directly.",
@@ -488,7 +487,7 @@ After I approve, ask me:
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
 3. **Screenshots/videos:** Do I have screenshots or video clips to include? Options:
    - **Already have a public URL?** Use it directly as \`image_url\` or \`video_url\` — no upload needed.
-   - **File attached in claude.ai (path starts with /mnt/user-data/)?** Call \`bragfast_get_upload_url\` with just \`filename\`. Response includes a ready-to-run curl command (PUT to R2 presigned URL) and the final public \`url\`. Execute the curl in the sandbox shell, then use the \`url\` as \`image_url\` / \`video_url\`. Do NOT base64-encode the file.
+   - **File attached in claude.ai (path starts with /mnt/user-data/)?** Call \`bragfast_get_upload_url\` with just \`filename\`. Response includes a ready-to-run curl command and the final public \`url\`. Execute the \`instructions\` field using the Bash tool directly, then use \`url\` as \`image_url\` / \`video_url\`. Do NOT base64-encode the file.
    - **Local file in Claude Code CLI?** Ask the user for the absolute file path (e.g. /Users/name/Desktop/hero.jpg), then use \`bragfast_upload_image\` with \`file_path\` — tool uploads automatically.
    - **File at a public URL (Dropbox, Google Drive, GitHub raw, WeTransfer)?** Use \`bragfast_get_upload_url\` with \`source_url\` — works in claude.ai and Claude Code.
 
