@@ -358,10 +358,10 @@ export function createBragfastServer({
       title: "Upload Image or Video",
       description:
         "Upload an image or video to Bragfast and get a hosted URL. Supports PNG/JPG/WebP/SVG and MP4/WebM/MOV up to 50MB.\n\n" +
-        "The MCP server handles the upload directly — no curl or python, no proxy issues.\n\n" +
+        "The MCP server handles the upload entirely — do NOT attempt to curl or PUT to any URL yourself. Just call this tool with the file source.\n\n" +
         "Input modes:\n" +
-        "- **file_path**: Absolute local path. MCP reads and uploads via presigned R2.\n" +
-        "- **source_url**: Public URL (Dropbox, Drive, WeTransfer, GitHub raw). MCP fetches and uploads via presigned R2. Works in Claude.ai sandbox.\n" +
+        "- **file_path**: Absolute local path. MCP reads and uploads automatically.\n" +
+        "- **source_url**: Public URL (Dropbox, Drive, WeTransfer, GitHub raw). MCP fetches and uploads automatically.\n" +
         "- **file_base64 / image_base64 + filename**: Base64 content (small files only, under ~5MB).\n\n" +
         "If you already have a public URL, skip upload and use it directly as image_url or video_url on the slide.",
       inputSchema: z.object({
@@ -410,12 +410,12 @@ export function createBragfastServer({
     {
       title: "Upload Video or Large Image",
       description:
-        "Upload a video or large image to Bragfast via presigned R2 URL (up to 50MB). Returns a hosted URL.\n\n" +
-        "The MCP server performs the upload directly — no curl or python required, no proxy issues.\n\n" +
-        "**Provide file source (required for server-side upload):**\n" +
-        "- `file_path`: Absolute local path. MCP reads file and PUTs to R2.\n" +
-        "- `source_url`: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). MCP fetches and PUTs to R2. Works in Claude.ai sandbox.\n\n" +
-        "**Fallback only** — omit both to get presigned URL + curl/python commands. ⚠️ These are blocked in Claude sandbox environments.",
+        "Upload a video or large image to Bragfast (up to 50MB). Returns a hosted URL to use as video_url or image_url.\n\n" +
+        "The MCP server handles the upload entirely — do NOT attempt to curl, PUT, or fetch any upload URL yourself. Just call this tool.\n\n" +
+        "**Provide file source (required for automatic upload):**\n" +
+        "- `file_path`: Absolute local path. MCP reads and uploads automatically.\n" +
+        "- `source_url`: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). MCP fetches and uploads automatically.\n\n" +
+        "**Omit both** only if you want manual upload commands (not recommended — may be blocked in sandboxed environments).",
       inputSchema: z.object({
         filename: z
           .string()
@@ -485,8 +485,8 @@ After I approve, ask me:
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
 3. **Screenshots/videos:** Do I have screenshots or video clips to include? Options:
    - **Already have a public URL?** Use it directly as \`image_url\` or \`video_url\` — no upload needed.
-   - **Local file in Claude Code CLI?** Use \`bragfast_upload_image\` with \`file_path\` or \`bragfast_get_upload_url\` with \`file_path\`.
-   - **File hosted somewhere (Dropbox, Google Drive, GitHub raw, WeTransfer)?** Use \`bragfast_get_upload_url\` with \`source_url\` — MCP server fetches and re-uploads. Works in Claude.ai sandbox where direct uploads are proxy-blocked.
+   - **Local file in Claude Code CLI?** Use \`bragfast_upload_image\` with \`file_path\` or \`bragfast_get_upload_url\` with \`file_path\`. The tool uploads automatically — do NOT curl or PUT to any URL yourself.
+   - **File hosted somewhere (Dropbox, Google Drive, GitHub raw, WeTransfer)?** Use \`bragfast_get_upload_url\` with \`source_url\` — MCP fetches and uploads automatically.
    - **Small image/logo only (<1MB)?** \`bragfast_upload_image\` with \`file_base64\` works.
    - **Last resort only:** \`bragfast_get_upload_url\` without file_path/source_url returns a presigned URL + curl/python commands, but these may be blocked in sandboxed environments.
 
