@@ -81,7 +81,7 @@ export function startCook(state: WizardState = {}): WizardResult {
       question:
         "Which template? Call bragfast_list_templates first, then ask the user to pick one.",
       hint:
-        "Heuristics: mobile work (React Native / Swift / Flutter) → *-mobile; web/dashboard → *-browser; marketing/launches or unclear → hero. Pre-select based on context. After listing, present up to 4 candidates via AskUserQuestion (header: 'Template', single-select) with your recommendation labelled 'X (recommended)' first. Fall back to plain text if AskUserQuestion isn't available.",
+        "Heuristics: mobile work (React Native / Swift / Flutter) → *-mobile; explicit marketing/launch/product announcement with hero asset → hero; everything else (web/dashboard/unclear) → split-browser (the default fallback). After listing, present up to 4 candidates via AskUserQuestion (header: 'Template', single-select) with your recommendation labelled 'X (recommended)' first. Fall back to plain text if AskUserQuestion isn't available.",
       collected: state,
     };
   }

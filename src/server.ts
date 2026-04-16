@@ -552,8 +552,8 @@ Call \`bragfast_check_account\`, \`bragfast_list_brands\`, and \`bragfast_list_t
 
 Pick a template based on context:
 - Mobile work (React Native, Swift, Flutter) → \`*-mobile\` template
-- Web/dashboard/browser UI → \`*-browser\` template
-- Marketing, launches, or unclear → \`hero\` template
+- Explicit marketing/launch/product announcement with a hero asset → \`hero\` template
+- Everything else (web/dashboard/browser UI, unclear) → \`split-browser\` (default fallback)
 
 Show your reasoning and let me confirm or change the choice.
 
