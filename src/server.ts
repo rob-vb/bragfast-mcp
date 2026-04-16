@@ -293,7 +293,7 @@ export function createBragfastServer({
     {
       title: "Get Render Status",
       description:
-        "Check the status of a render job. Returns status, and image/video URLs when complete. Completed image renders are displayed inline.",
+        "Check the status of a render job. Returns status, and image/video URLs when complete. Completed image renders are displayed inline; completed videos are returned as resource links (mimeType `video/mp4`) for the client to render or download.",
       inputSchema: z.object({
         cook_id: z
           .string()
@@ -308,6 +308,7 @@ export function createBragfastServer({
         const content: Array<
           | { type: "text"; text: string }
           | { type: "image"; data: string; mimeType: string; annotations?: { audience: ("user" | "assistant")[] } }
+          | { type: "resource_link"; uri: string; name: string; mimeType: string; description?: string; annotations?: { audience: ("user" | "assistant")[] } }
         > = [{ type: "text" as const, text: JSON.stringify(result, null, 2) }];
 
         if (result.status === "completed" && result.images) {
@@ -324,6 +325,19 @@ export function createBragfastServer({
                 annotations: { audience: ["user"] },
               });
             }
+          }
+        }
+
+        if (result.status === "completed" && result.videos) {
+          for (const [format, video] of Object.entries(result.videos)) {
+            content.push({
+              type: "resource_link" as const,
+              uri: video.url,
+              name: `${format}.mp4`,
+              mimeType: "video/mp4",
+              description: `${video.dimensions} · ${video.duration}s`,
+              annotations: { audience: ["user"] },
+            });
           }
         }
 
