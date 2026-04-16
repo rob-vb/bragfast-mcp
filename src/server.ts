@@ -106,7 +106,7 @@ export function createBragfastServer({
     {
       title: "Generate Release Video",
       description:
-        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Supports landscape/square/portrait. Each object may include video_url (must be a publicly accessible URL) to play a clip in place of image_url. For local MP4 files, call bragfast_get_upload_url first to get a presigned upload URL, upload the file via curl/python, then pass the hosted URL as video_url.",
+        "Generate a branded release announcement video. Returns a cook_id immediately — use bragfast_get_render_status to poll for completion. Supports landscape/square/portrait. Each object may include video_url (must be a publicly accessible URL) to play a clip in place of image_url. For local MP4 files or files at a public URL, call bragfast_get_upload_url with file_path or source_url — the MCP server uploads directly to R2 and returns the hosted URL to use as video_url.",
       inputSchema: z.object({
         brand_id: z.string().optional(),
         colors: z
@@ -357,20 +357,36 @@ export function createBragfastServer({
     {
       title: "Upload Image or Video",
       description:
-        "ONLY for tiny images under 50KB (small logos, icons) via base64, or local files via file_path. Supports images (PNG/JPG/WebP/SVG) and videos (MP4/WebM/MOV). DO NOT use for screenshots, photos, or user-attached images — use bragfast_get_upload_url instead. If you already have a public URL, skip upload entirely and use it as image_url or video_url in the slide.",
+        "Upload an image or video to Bragfast and get a hosted URL. Supports PNG/JPG/WebP/SVG and MP4/WebM/MOV up to 50MB.\n\n" +
+        "The MCP server handles the upload directly — no curl or python, no proxy issues.\n\n" +
+        "Input modes:\n" +
+        "- **file_path**: Absolute local path. MCP reads and uploads via presigned R2.\n" +
+        "- **source_url**: Public URL (Dropbox, Drive, WeTransfer, GitHub raw). MCP fetches and uploads via presigned R2. Works in Claude.ai sandbox.\n" +
+        "- **file_base64 / image_base64 + filename**: Base64 content (small files only, under ~5MB).\n\n" +
+        "If you already have a public URL, skip upload and use it directly as image_url or video_url on the slide.",
       inputSchema: z.object({
         file_path: z
           .string()
           .optional()
-          .describe("Absolute path to a local image or video file"),
+          .describe("Absolute path to a local image or video file (Claude Code CLI only)"),
+        source_url: z
+          .string()
+          .optional()
+          .describe(
+            "Publicly accessible URL to fetch the file from (Dropbox direct-download, Google Drive, GitHub raw, etc.). MCP server downloads and re-uploads — works in Claude.ai sandbox where direct uploads are proxy-blocked."
+          ),
+        file_base64: z
+          .string()
+          .optional()
+          .describe("Base64-encoded file content for images or small videos"),
         image_base64: z
           .string()
           .optional()
-          .describe("Base64-encoded image file content (images only)"),
+          .describe("Alias for file_base64 (legacy)"),
         filename: z
           .string()
           .optional()
-          .describe("Filename with extension (required with image_base64, e.g. screenshot.png)"),
+          .describe("Filename with extension — required with file_base64/image_base64, optional with source_url if URL path contains filename"),
       }),
     },
     async (input) => {
@@ -392,15 +408,26 @@ export function createBragfastServer({
   server.registerTool(
     "bragfast_get_upload_url",
     {
-      title: "Get Upload URL",
+      title: "Upload Video or Large Image",
       description:
-        "Upload an image or video to Bragfast. This is the DEFAULT upload method — use this for all images (PNG/JPG/WebP/SVG) and videos (MP4/WebM/MOV up to 50MB). Returns a presigned URL with both curl and python upload commands. Try curl first; if blocked by proxy, use the python command instead. After uploading, use the upload_id to get the hosted URL. DO NOT base64-encode files — use this tool instead. For video slides, upload the MP4 here and pass the returned URL as video_url on the slide object.",
+        "Upload a video or large image to Bragfast via presigned R2 URL (up to 50MB). Returns a hosted URL.\n\n" +
+        "The MCP server performs the upload directly — no curl or python required, no proxy issues.\n\n" +
+        "**Provide file source (required for server-side upload):**\n" +
+        "- `file_path`: Absolute local path. MCP reads file and PUTs to R2.\n" +
+        "- `source_url`: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). MCP fetches and PUTs to R2. Works in Claude.ai sandbox.\n\n" +
+        "**Fallback only** — omit both to get presigned URL + curl/python commands. ⚠️ These are blocked in Claude sandbox environments.",
       inputSchema: z.object({
         filename: z
           .string()
-          .describe(
-            "Filename with extension (e.g. screenshot.png, photo.jpg, demo.mp4)"
-          ),
+          .describe("Filename with extension (e.g. screenshot.png, demo.mp4)"),
+        file_path: z
+          .string()
+          .optional()
+          .describe("Absolute path to a local file. MCP server reads and uploads — no proxy issues."),
+        source_url: z
+          .string()
+          .optional()
+          .describe("Public URL to fetch the file from. MCP server downloads and uploads — works in Claude.ai sandbox."),
       }),
     },
     async (input) => {
@@ -456,7 +483,12 @@ You can edit, remove, or add slides — or say "looks good" to continue.
 After I approve, ask me:
 1. **Output type:** Images (static), Video (animated), or Both? If video, ask which animation preset: Showcase (cinematic rise + reveal), 3D Tilt Angles (perspective tilt), or Simple Fade (clean fade-in).
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
-3. **Screenshots/videos:** Do I have screenshots or video clips to include? If so, I can provide a public URL (pass directly as \`image_url\` or \`video_url\` in the slide) or attach the file in chat. For attached files or local paths (images or MP4/WebM/MOV up to 50MB), use \`bragfast_get_upload_url\` to get a presigned upload URL, then run the curl command to upload directly — this avoids passing large base64 through the context window. For small images like logos, \`bragfast_upload_image\` with base64 also works.
+3. **Screenshots/videos:** Do I have screenshots or video clips to include? Options:
+   - **Already have a public URL?** Use it directly as \`image_url\` or \`video_url\` — no upload needed.
+   - **Local file in Claude Code CLI?** Use \`bragfast_upload_image\` with \`file_path\` or \`bragfast_get_upload_url\` with \`file_path\`.
+   - **File hosted somewhere (Dropbox, Google Drive, GitHub raw, WeTransfer)?** Use \`bragfast_get_upload_url\` with \`source_url\` — MCP server fetches and re-uploads. Works in Claude.ai sandbox where direct uploads are proxy-blocked.
+   - **Small image/logo only (<1MB)?** \`bragfast_upload_image\` with \`file_base64\` works.
+   - **Last resort only:** \`bragfast_get_upload_url\` without file_path/source_url returns a presigned URL + curl/python commands, but these may be blocked in sandboxed environments.
 
 ## Step 2: Brand & Template Setup
 
