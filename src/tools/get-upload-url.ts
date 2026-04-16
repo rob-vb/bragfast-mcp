@@ -33,6 +33,17 @@ export interface UploadResult {
   status: string;
 }
 
+export interface TokenUploadResult {
+  upload_token: string;
+  upload_url: string;
+  expires_in_seconds: number;
+  max_size_bytes: number;
+  method: "POST";
+  content_type: "multipart/form-data";
+  instructions: string;
+  hint: string;
+}
+
 function getContentType(filename: string): string {
   const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
   const contentType = MIME_TYPES[ext];
@@ -45,25 +56,29 @@ function getContentType(filename: string): string {
 }
 
 /**
- * Upload a file to Bragfast via presigned R2 URL.
+ * Upload a file to Bragfast.
  *
- * When file_path or source_url is provided, the MCP server:
- *   1. Gets a presigned upload URL from the Bragfast API
- *   2. PUTs the file bytes directly to R2 (MCP server's own network — not
- *      subject to the Claude sandbox proxy that blocks bash curl/python)
- *   3. GETs /upload/:upload_id to resolve and return the hosted URL
+ * Four dispatch branches, selected by what the caller provides:
  *
- * When neither is provided, falls back to returning the presigned URL + shell
- * commands for manual upload (may be blocked in sandboxed environments).
+ * 1. file_path (Claude Code CLI): MCP server reads the local file and uploads.
+ *    Large files (>4MB) use chunked upload; smaller files use presigned R2 PUT
+ *    with multipart POST fallback when the PUT is network-blocked.
+ *
+ * 2. source_url: MCP server fetches the remote file and uploads via the same
+ *    chunked / presigned / multipart decision tree as file_path.
+ *
+ * 3. filename only (claude.ai sandbox): MCP server mints a single-use upload
+ *    token via POST /upload/token and returns a TokenUploadResult containing
+ *    an `instructions` curl command. The Claude sandbox runs that curl against
+ *    brag.fast to upload the file directly (no MCP server involvement in the
+ *    actual transfer).
+ *
+ * 4. Nothing meaningful: error — filename is required at minimum.
  */
 export async function getUploadUrl(
   client: BragfastApiClient,
   input: GetUploadUrlInput
-): Promise<
-  | (PresignedUploadResult & { upload_commands: { curl: string; python: string } })
-  | UploadResult
-  | { url: string }
-> {
+): Promise<UploadResult | { url: string } | TokenUploadResult> {
   const contentType = getContentType(input.filename);
 
   // Load buffer first so we can choose the right upload path based on file size.
@@ -144,15 +159,30 @@ export async function getUploadUrl(
     return presigned as unknown as UploadResult;
   }
 
-  // No file provided: get presigned URL for manual upload.
-  const presigned = await client.post<PresignedUploadResult>("/upload/presigned", {
+  // No file provided: mint a single-use upload token the sandbox can curl.
+  // The sandbox (claude.ai, Claude Desktop, Claude Cowork) POSTs to the
+  // returned upload_url — no MCP server involvement in the actual transfer.
+  const mint = await client.post<{
+    upload_token: string;
+    upload_url: string;
+    expires_in_seconds: number;
+    max_size_bytes: number;
+  }>("/upload/token", {
     filename: input.filename,
     content_type: contentType,
   });
 
-  // Fallback: return presigned URL + commands for manual execution.
-  const curlCommand = `curl -X PUT -H 'Content-Type: ${contentType}' -T '${input.filename}' '${presigned.upload_url}'`;
-  const pythonCommand = `python3 -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('${presigned.upload_url}', data=open('${input.filename}', 'rb').read(), method='PUT', headers={'Content-Type': '${contentType}'}))"`;
+  const instructions = `curl -X POST -F 'file=@<local_file_path>' '${mint.upload_url}'`;
+  const hint =
+    "Replace <local_file_path> with the actual path to the file (e.g. /mnt/user-data/uploads/hero.png). " +
+    "If curl fails with 'host_not_allowed' or 403, ask the user to add 'brag.fast' to " +
+    "Settings → Capabilities → Network Egress → Additional allowed domains.";
 
-  return { ...presigned, upload_commands: { curl: curlCommand, python: pythonCommand } };
+  return {
+    ...mint,
+    method: "POST" as const,
+    content_type: "multipart/form-data" as const,
+    instructions,
+    hint,
+  };
 }
