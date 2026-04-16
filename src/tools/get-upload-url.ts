@@ -23,6 +23,7 @@ export interface GetUploadUrlInput {
 export interface PresignedUploadResult {
   upload_id: string;
   upload_url: string;
+  public_url: string;
   expires_in: number;
   max_size_bytes: number;
 }
@@ -33,13 +34,14 @@ export interface UploadResult {
   status: string;
 }
 
-export interface TokenUploadResult {
-  upload_token: string;
+export interface SandboxUploadResult {
+  upload_id: string;
   upload_url: string;
-  expires_in_seconds: number;
+  url: string;
+  expires_in: number;
   max_size_bytes: number;
-  method: "POST";
-  content_type: "multipart/form-data";
+  method: "PUT";
+  content_type: string;
   instructions: string;
   hint: string;
 }
@@ -58,7 +60,7 @@ function getContentType(filename: string): string {
 /**
  * Upload a file to Bragfast.
  *
- * Four dispatch branches, selected by what the caller provides:
+ * Three dispatch branches, selected by what the caller provides:
  *
  * 1. file_path (Claude Code CLI): MCP server reads the local file and uploads.
  *    Large files (>4MB) use chunked upload; smaller files use presigned R2 PUT
@@ -67,18 +69,16 @@ function getContentType(filename: string): string {
  * 2. source_url: MCP server fetches the remote file and uploads via the same
  *    chunked / presigned / multipart decision tree as file_path.
  *
- * 3. filename only (claude.ai sandbox): MCP server mints a single-use upload
- *    token via POST /upload/token and returns a TokenUploadResult containing
- *    an `instructions` curl command. The Claude sandbox runs that curl against
- *    brag.fast to upload the file directly (no MCP server involvement in the
- *    actual transfer).
- *
- * 4. Nothing meaningful: error — filename is required at minimum.
+ * 3. filename only (claude.ai sandbox): MCP server calls POST /upload/presigned
+ *    and returns the R2-signed PUT URL + the final R2 public CDN URL upfront.
+ *    The sandbox curls PUT directly to R2 — brag.fast domain is not touched
+ *    from the sandbox. Both R2 hostnames (*.r2.cloudflarestorage.com and the
+ *    public CDN) are on claude.ai's default egress allowlist.
  */
 export async function getUploadUrl(
   client: BragfastApiClient,
   input: GetUploadUrlInput
-): Promise<UploadResult | { url: string } | TokenUploadResult> {
+): Promise<UploadResult | { url: string } | SandboxUploadResult> {
   const contentType = getContentType(input.filename);
 
   // Load buffer first so we can choose the right upload path based on file size.
@@ -151,32 +151,29 @@ export async function getUploadUrl(
     return presigned as unknown as UploadResult;
   }
 
-  // No file provided: mint a single-use upload token the sandbox can curl.
-  // The sandbox (claude.ai, Claude Desktop, Claude Cowork) POSTs to the
-  // returned upload_url — no MCP server involvement in the actual transfer.
-  const mint = await client.post<{
-    upload_token: string;
-    upload_url: string;
-    expires_in_seconds: number;
-    max_size_bytes: number;
-  }>("/upload/token", {
+  // No file provided (claude.ai sandbox path): return a presigned R2 PUT URL
+  // and the final public CDN URL upfront. The sandbox curls PUT directly to
+  // R2 — brag.fast domain is not involved in the transfer. Both R2 hostnames
+  // are on claude.ai's default egress allowlist.
+  const presigned = await client.post<PresignedUploadResult>("/upload/presigned", {
     filename: input.filename,
     content_type: contentType,
   });
 
-  const instructions = `curl -X POST -F 'file=@<local_file_path>' '${mint.upload_url}'`;
+  const instructions = `curl -X PUT -H 'Content-Type: ${contentType}' --upload-file <local_file_path> '${presigned.upload_url}'`;
   const hint =
     "Replace <local_file_path> with the actual path to the file (e.g. /mnt/user-data/uploads/hero.png). " +
-    "If curl fails with a DNS error (e.g. 'DNS cache overflow', 'Could not resolve host'), " +
-    "use your Read tool to read the file as base64, then call bragfast_upload_image with " +
-    "file_base64=<base64_content> and filename=<original_filename> instead of using curl. " +
-    "If curl fails with 'host_not_allowed' or 403, ask the user to add 'brag.fast' to " +
-    "Settings → Capabilities → Network Egress → Additional allowed domains.";
+    "After curl succeeds, use the `url` field as image_url or video_url in downstream generate calls — no further upload calls needed. " +
+    "The upload URL is a curl-able R2 presigned URL; requires shell access to execute (e.g. Claude Code, claude.ai sandbox).";
 
   return {
-    ...mint,
-    method: "POST" as const,
-    content_type: "multipart/form-data" as const,
+    upload_id: presigned.upload_id,
+    upload_url: presigned.upload_url,
+    url: presigned.public_url,
+    expires_in: presigned.expires_in,
+    max_size_bytes: presigned.max_size_bytes,
+    method: "PUT" as const,
+    content_type: contentType,
     instructions,
     hint,
   };

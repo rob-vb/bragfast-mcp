@@ -364,33 +364,32 @@ export function createBragfastServer({
       description:
         "Upload an image or video to Bragfast and get a hosted URL. Supports PNG/JPG/WebP/SVG and MP4/WebM/MOV.\n\n" +
         "Input modes:\n" +
-        "- `file_path`: pass the file path — including `/mnt/user-data/` sandbox paths from claude.ai attachments. The tool auto-detects sandbox paths and returns a one-time curl-able upload URL + curl command. Requires shell access to execute the curl.\n" +
-        "- `source_url`: public URL — MCP server fetches and uploads (works in claude.ai)\n" +
-        "- `file_base64` / `image_base64` + `filename`: base64 content already in context — small images only (<1MB, never videos)\n\n" +
+        "- `file_path`: pass the file path — including `/mnt/user-data/` sandbox paths from claude.ai attachments. Tool auto-detects sandbox paths and returns a curl-able upload URL (R2 presigned PUT) + ready-to-run curl command. Requires shell access to run the curl command, e.g. Claude Code or claude.ai sandbox. Do NOT base64-encode the file.\n" +
+        "- `source_url`: public URL — MCP server fetches and uploads server-side.\n\n" +
         "If you already have a public URL, use it directly as image_url / video_url — no upload needed.",
       inputSchema: z.object({
         file_path: z
           .string()
           .optional()
-          .describe("Path to the file. Pass /mnt/user-data/ sandbox paths directly — tool returns a one-time curl-able upload URL + command. Requires shell access to execute."),
+          .describe("Path to the file. Pass /mnt/user-data/ sandbox paths directly — tool returns a curl-able upload URL (R2 presigned PUT) + command. Requires shell access to run the curl command."),
         source_url: z
           .string()
           .optional()
           .describe(
-            "Publicly accessible URL to fetch the file from (Dropbox direct-download, Google Drive, GitHub raw, etc.). MCP server downloads and re-uploads — works in Claude.ai sandbox where direct uploads are proxy-blocked."
+            "Publicly accessible URL to fetch the file from (Dropbox direct-download, Google Drive, GitHub raw, etc.). MCP server downloads and re-uploads server-side."
           ),
         file_base64: z
           .string()
           .optional()
-          .describe("Base64-encoded file content for images or small videos"),
+          .describe("Deprecated — prefer file_path (sandbox) or source_url (public URL). Present for backward compat."),
         image_base64: z
           .string()
           .optional()
-          .describe("Alias for file_base64 (legacy)"),
+          .describe("Alias for file_base64 (legacy). Deprecated."),
         filename: z
           .string()
           .optional()
-          .describe("Filename with extension — required with file_base64/image_base64, optional with source_url if URL path contains filename"),
+          .describe("Filename with extension — optional with source_url if URL path contains filename."),
       }),
     },
     async (input) => {
@@ -414,13 +413,12 @@ export function createBragfastServer({
     {
       title: "Upload Video or Large Image",
       description:
-        "Upload a file to Bragfast. Returns a hosted URL (`url`) to use as image_url or video_url.\n\n" +
+        "Returns a curl-able upload URL for local files (up to 50MB). After calling this, use shell/curl to upload — do NOT base64-encode the file.\n\n" +
+        "    curl -X PUT -H 'Content-Type: <content_type>' --upload-file <local_path> <upload_url>\n\n" +
+        "Use the returned `url` field as image_url or video_url in generate calls. Requires shell access to run the curl command, e.g. Claude Code or claude.ai sandbox.\n\n" +
         "Two modes:\n" +
-        "- `source_url` → fetch from a public URL (works everywhere)\n" +
-        "- `filename` only → get a one-time curl-able upload URL for files in the claude.ai sandbox (path starts with `/mnt/user-data/`). Requires shell access to run the returned curl command.\n\n" +
-        "For the `filename`-only mode: the response includes an `instructions` field with a ready-to-run curl command. Execute it — curl POSTs the file directly to brag.fast and returns `{ url }`. Use that url as image_url / video_url.\n\n" +
-        "If curl fails with a DNS error ('DNS cache overflow', 'Could not resolve host'): fall back to bragfast_upload_image with file_base64 (read the file with your Read tool, pass as base64) + filename. The MCP server uploads server-side — no sandbox DNS needed.\n\n" +
-        "If curl fails with `host_not_allowed` or 403: ask the user to add `brag.fast` to Settings → Capabilities → Network Egress → Additional allowed domains.",
+        "- `filename` only → returns R2-signed PUT URL for sandbox attachments (path starts with `/mnt/user-data/`). Sandbox runs the curl.\n" +
+        "- `source_url` → MCP server fetches from a public URL and uploads server-side; returns `{ url }` directly.",
       inputSchema: z.object({
         filename: z
           .string()
@@ -490,11 +488,9 @@ After I approve, ask me:
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
 3. **Screenshots/videos:** Do I have screenshots or video clips to include? Options:
    - **Already have a public URL?** Use it directly as \`image_url\` or \`video_url\` — no upload needed.
-   - **File attached in claude.ai (path starts with /mnt/user-data/)?** Call \`bragfast_get_upload_url\` with just \`filename\`, then run the returned \`instructions\` curl in the sandbox. The curl POSTs to \`brag.fast\` and returns \`{ url }\` — use that as \`image_url\` / \`video_url\`. If curl fails with a DNS error ('DNS cache overflow', 'Could not resolve host'): use \`bragfast_upload_image\` with \`file_base64\` (read the file via Read tool, pass as base64) + \`filename\` — MCP server uploads server-side. If curl fails with \`host_not_allowed\`, ask the user to add \`brag.fast\` to Settings → Capabilities → Network Egress.
+   - **File attached in claude.ai (path starts with /mnt/user-data/)?** Call \`bragfast_get_upload_url\` with just \`filename\`. Response includes a ready-to-run curl command (PUT to R2 presigned URL) and the final public \`url\`. Execute the curl in the sandbox shell, then use the \`url\` as \`image_url\` / \`video_url\`. Do NOT base64-encode the file.
    - **Local file in Claude Code CLI?** Ask the user for the absolute file path (e.g. /Users/name/Desktop/hero.jpg), then use \`bragfast_upload_image\` with \`file_path\` — tool uploads automatically.
    - **File at a public URL (Dropbox, Google Drive, GitHub raw, WeTransfer)?** Use \`bragfast_get_upload_url\` with \`source_url\` — works in claude.ai and Claude Code.
-   - **File >4MB attached in claude.ai?** The curl path is capped at 4MB. Ask the user to host the file publicly (Dropbox, WeTransfer) and pass it as \`source_url\`.
-   - **Small image/logo only (<4MB)?** \`bragfast_upload_image\` with \`file_base64\` works. Do NOT use base64 for videos or large files — it will crash the session.
 
 ## Step 2: Brand & Template Setup
 

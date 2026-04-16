@@ -49,44 +49,47 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// ─── Token-upload branch (filename only, no file_path / source_url) ──────────
+// ─── Sandbox-presigned branch (filename only, no file_path / source_url) ─────
 
-describe("getUploadUrl — token-upload branch", () => {
-  const mintResponse = {
-    upload_token: "utk_abc123",
-    upload_url: "https://brag.fast/api/v1/upload/by-token?upload_token=utk_abc123",
-    expires_in_seconds: 900,
-    max_size_bytes: 4194304,
+describe("getUploadUrl — sandbox presigned branch", () => {
+  const presignedResponse = {
+    upload_id: "upl_abc123",
+    upload_url: "https://abc.r2.cloudflarestorage.com/bucket/hero.png?X-Amz-Signature=xyz",
+    public_url: "https://pub-abc.r2.dev/hero.png",
+    expires_in: 900,
+    max_size_bytes: 52428800,
   };
 
-  it("returns TokenUploadResult with instructions and hint for an image", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(makeResponse(201, mintResponse));
+  it("returns SandboxUploadResult with PUT instructions and final url for an image", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(makeResponse(200, presignedResponse));
 
     const client = new BragfastApiClient(TEST_BASE_URL);
     const result = await getUploadUrl(client, { filename: "hero.png" });
 
     expect(result).toMatchObject({
-      upload_token: "utk_abc123",
-      upload_url: mintResponse.upload_url,
-      expires_in_seconds: 900,
-      max_size_bytes: 4194304,
-      method: "POST",
-      content_type: "multipart/form-data",
+      upload_id: "upl_abc123",
+      upload_url: presignedResponse.upload_url,
+      url: presignedResponse.public_url,
+      expires_in: 900,
+      max_size_bytes: 52428800,
+      method: "PUT",
+      content_type: "image/png",
     });
 
     const r = result as Awaited<ReturnType<typeof getUploadUrl>> & {
       instructions: string;
       hint: string;
     };
-    expect(r.instructions).toContain("curl -X POST");
-    expect(r.instructions).toContain("-F 'file=@<local_file_path>'");
-    expect(r.instructions).toContain(mintResponse.upload_url);
-    expect(r.hint).toContain("brag.fast");
-    expect(r.hint).toContain("host_not_allowed");
+    expect(r.instructions).toContain("curl -X PUT");
+    expect(r.instructions).toContain("--upload-file <local_file_path>");
+    expect(r.instructions).toContain("'Content-Type: image/png'");
+    expect(r.instructions).toContain(presignedResponse.upload_url);
+    expect(r.hint).toContain("curl-able");
+    expect(r.hint).toContain("shell access");
   });
 
   it("sends correct filename and content_type for video", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(makeResponse(201, { ...mintResponse, upload_token: "utk_vid" }));
+    vi.mocked(fetch).mockResolvedValueOnce(makeResponse(200, { ...presignedResponse, upload_id: "upl_vid" }));
 
     const client = new BragfastApiClient(TEST_BASE_URL);
     await getUploadUrl(client, { filename: "demo.mp4" });
@@ -97,7 +100,23 @@ describe("getUploadUrl — token-upload branch", () => {
     expect(body.content_type).toBe("video/mp4");
   });
 
-  it("propagates 429 rate-limit error from mint call", async () => {
+  it("routes /mnt/user-data/ file_path through the same sandbox presigned branch", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(makeResponse(200, presignedResponse));
+
+    const client = new BragfastApiClient(TEST_BASE_URL);
+    const result = await getUploadUrl(client, {
+      filename: "hero.png",
+      file_path: "/mnt/user-data/uploads/hero.png",
+    });
+
+    expect(result).toMatchObject({
+      url: presignedResponse.public_url,
+      method: "PUT",
+    });
+    expect(fs.readFile).not.toHaveBeenCalled();
+  });
+
+  it("propagates 429 rate-limit error from presigned call", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       makeResponse(429, { error: "Too many requests" }, { "Retry-After": "60" })
     );
@@ -113,21 +132,6 @@ describe("getUploadUrl — token-upload branch", () => {
     await expect(getUploadUrl(client, { filename: "doc.pdf" })).rejects.toThrow(
       "Unsupported file type: .pdf"
     );
-    expect(fetch).not.toHaveBeenCalled();
-  });
-});
-
-// ─── /mnt/user-data/ guard ────────────────────────────────────────────────────
-
-describe("getUploadUrl — sandbox path guard", () => {
-  it("throws immediately without calling API for /mnt/user-data/ path", async () => {
-    const client = new BragfastApiClient(TEST_BASE_URL);
-    await expect(
-      getUploadUrl(client, {
-        filename: "hero.png",
-        file_path: "/mnt/user-data/uploads/hero.png",
-      })
-    ).rejects.toThrow("Claude sandbox path");
     expect(fetch).not.toHaveBeenCalled();
   });
 });

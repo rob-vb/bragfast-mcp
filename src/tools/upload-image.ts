@@ -45,12 +45,13 @@ export async function uploadImage(
     image_base64?: string;
     filename?: string;
   }
-): Promise<{ url: string } | import("./get-upload-url.js").TokenUploadResult> {
+): Promise<{ url: string } | import("./get-upload-url.js").SandboxUploadResult> {
   // Claude sandbox path (/mnt/user-data/): MCP server cannot read these.
-  // Delegate to token flow — return curl instructions so the sandbox uploads directly.
+  // Delegate to presigned-URL flow — return PUT curl + final public URL so
+  // the sandbox uploads directly to R2.
   if (input.file_path?.startsWith("/mnt/user-data/")) {
     const filename = input.filename ?? basename(input.file_path);
-    return getUploadUrl(client, { filename }) as Promise<import("./get-upload-url.js").TokenUploadResult>;
+    return getUploadUrl(client, { filename }) as Promise<import("./get-upload-url.js").SandboxUploadResult>;
   }
 
   // For file_path and source_url, use the presigned R2 upload flow so large
