@@ -65,7 +65,8 @@ export async function uploadImage(
     throw new Error("Upload did not return a hosted URL");
   }
 
-  // Base64 path — file is already in memory and implicitly small.
+  // Base64 path — small files only (<4MB). Large files via base64 bloat the
+  // context window and should use file_path (Claude Code CLI) or source_url instead.
   const b64 = input.file_base64 ?? input.image_base64;
   if (b64 && input.filename) {
     const name = input.filename;

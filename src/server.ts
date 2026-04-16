@@ -358,11 +358,12 @@ export function createBragfastServer({
       title: "Upload Image or Video",
       description:
         "Upload an image or video to Bragfast and get a hosted URL. Supports PNG/JPG/WebP/SVG and MP4/WebM/MOV up to 50MB.\n\n" +
-        "The MCP server handles the upload entirely — do NOT attempt to curl or PUT to any URL yourself. Just call this tool with the file source.\n\n" +
+        "The MCP server handles the upload entirely — do NOT attempt to curl or PUT to any URL yourself.\n\n" +
         "Input modes:\n" +
-        "- **file_path**: Absolute local path. MCP reads and uploads automatically.\n" +
-        "- **source_url**: Public URL (Dropbox, Drive, WeTransfer, GitHub raw). MCP fetches and uploads automatically.\n" +
-        "- **file_base64 / image_base64 + filename**: Base64 content (small files only, under ~5MB).\n\n" +
+        "- **file_path**: Absolute local path — **Claude Code CLI only**. Not available in claude.ai.\n" +
+        "- **source_url**: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). Works everywhere including claude.ai. Best option for large files in claude.ai.\n" +
+        "- **file_base64 / image_base64 + filename**: Base64 content — **small files only (<4MB)**. Do NOT use for videos or large images — it bloats the context window and will crash the session.\n\n" +
+        "⚠️ In claude.ai with a large local file: ask the user to upload to Dropbox/Google Drive/WeTransfer and provide a direct download link. Use that as source_url.\n\n" +
         "If you already have a public URL, skip upload and use it directly as image_url or video_url on the slide.",
       inputSchema: z.object({
         file_path: z
@@ -411,10 +412,11 @@ export function createBragfastServer({
       title: "Upload Video or Large Image",
       description:
         "Upload a video or large image to Bragfast (up to 50MB). Returns a hosted URL to use as video_url or image_url.\n\n" +
-        "The MCP server handles the upload entirely — do NOT attempt to curl, PUT, or fetch any upload URL yourself. Just call this tool.\n\n" +
-        "**Provide file source (required for automatic upload):**\n" +
-        "- `file_path`: Absolute local path. MCP reads and uploads automatically.\n" +
-        "- `source_url`: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). MCP fetches and uploads automatically.\n\n" +
+        "The MCP server handles the upload entirely — do NOT attempt to curl, PUT, or fetch any upload URL yourself.\n\n" +
+        "**Provide file source:**\n" +
+        "- `file_path`: Absolute local path — **Claude Code CLI only**. Not available in claude.ai.\n" +
+        "- `source_url`: Public URL (Dropbox direct-download, Google Drive, WeTransfer, GitHub raw). Works everywhere. **Required for large files in claude.ai.**\n\n" +
+        "⚠️ In claude.ai with a large local file: do NOT encode as base64 (kills context). Ask the user to upload to Dropbox/WeTransfer and give you a direct download link.\n\n" +
         "**Omit both** only if you want manual upload commands (not recommended — may be blocked in sandboxed environments).",
       inputSchema: z.object({
         filename: z
@@ -485,9 +487,10 @@ After I approve, ask me:
 2. **Formats:** Landscape (Twitter/X, blogs), Portrait (Stories, TikTok), Square (LinkedIn, Instagram) — I can pick multiple.
 3. **Screenshots/videos:** Do I have screenshots or video clips to include? Options:
    - **Already have a public URL?** Use it directly as \`image_url\` or \`video_url\` — no upload needed.
-   - **Local file in Claude Code CLI?** Use \`bragfast_upload_image\` with \`file_path\` or \`bragfast_get_upload_url\` with \`file_path\`. The tool uploads automatically — do NOT curl or PUT to any URL yourself.
-   - **File hosted somewhere (Dropbox, Google Drive, GitHub raw, WeTransfer)?** Use \`bragfast_get_upload_url\` with \`source_url\` — MCP fetches and uploads automatically.
-   - **Small image/logo only (<1MB)?** \`bragfast_upload_image\` with \`file_base64\` works.
+   - **Local file in Claude Code CLI?** Use \`bragfast_upload_image\` with \`file_path\` — tool uploads automatically, do NOT curl anywhere.
+   - **In claude.ai with a large local file?** Cannot upload directly. Ask the user to upload to Dropbox/WeTransfer/Google Drive and share a direct download link, then use \`source_url\`.
+   - **File at a public URL (Dropbox, Google Drive, GitHub raw, WeTransfer)?** Use \`bragfast_get_upload_url\` with \`source_url\` — works in claude.ai and Claude Code.
+   - **Small image/logo only (<4MB)?** \`bragfast_upload_image\` with \`file_base64\` works. Do NOT use base64 for videos or large files — it will crash the session.
    - **Last resort only:** \`bragfast_get_upload_url\` without file_path/source_url returns a presigned URL + curl/python commands, but these may be blocked in sandboxed environments.
 
 ## Step 2: Brand & Template Setup
