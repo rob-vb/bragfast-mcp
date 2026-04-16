@@ -364,7 +364,7 @@ export function createBragfastServer({
       description:
         "Upload an image or video to Bragfast and get a hosted URL. Supports PNG/JPG/WebP/SVG and MP4/WebM/MOV.\n\n" +
         "Input modes:\n" +
-        "- `file_path`: pass the file path — including `/mnt/user-data/` sandbox paths from claude.ai attachments. The tool auto-detects sandbox paths and returns a curl command + instructions to upload directly from the sandbox (no public URL needed).\n" +
+        "- `file_path`: pass the file path — including `/mnt/user-data/` sandbox paths from claude.ai attachments. The tool auto-detects sandbox paths and returns a one-time curl-able upload URL + curl command. Requires shell access to execute the curl.\n" +
         "- `source_url`: public URL — MCP server fetches and uploads (works in claude.ai)\n" +
         "- `file_base64` / `image_base64` + `filename`: base64 content already in context — small images only (<1MB, never videos)\n\n" +
         "If you already have a public URL, use it directly as image_url / video_url — no upload needed.",
@@ -372,7 +372,7 @@ export function createBragfastServer({
         file_path: z
           .string()
           .optional()
-          .describe("Path to the file. Pass /mnt/user-data/ paths directly — the tool detects sandbox paths and returns curl upload instructions automatically."),
+          .describe("Path to the file. Pass /mnt/user-data/ sandbox paths directly — tool returns a one-time curl-able upload URL + command. Requires shell access to execute."),
         source_url: z
           .string()
           .optional()
