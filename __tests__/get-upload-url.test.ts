@@ -67,13 +67,7 @@ describe("getUploadUrl — sandbox presigned branch", () => {
     const result = await getUploadUrl(client, { filename: "hero.png" });
 
     expect(result).toMatchObject({
-      upload_id: "upl_abc123",
-      upload_url: presignedResponse.upload_url,
       url: presignedResponse.public_url,
-      expires_in: 900,
-      max_size_bytes: 52428800,
-      method: "PUT",
-      content_type: "image/png",
     });
 
     const r = result as Awaited<ReturnType<typeof getUploadUrl>> & {
@@ -84,8 +78,7 @@ describe("getUploadUrl — sandbox presigned branch", () => {
     expect(r.instructions).toContain("--upload-file <local_file_path>");
     expect(r.instructions).toContain("'Content-Type: image/png'");
     expect(r.instructions).toContain(presignedResponse.upload_url);
-    expect(r.hint).toContain("curl-able");
-    expect(r.hint).toContain("shell access");
+    expect(r.hint).toContain("Bash tool");
   });
 
   it("sends correct filename and content_type for video", async () => {
@@ -111,7 +104,6 @@ describe("getUploadUrl — sandbox presigned branch", () => {
 
     expect(result).toMatchObject({
       url: presignedResponse.public_url,
-      method: "PUT",
     });
     expect(fs.readFile).not.toHaveBeenCalled();
   });

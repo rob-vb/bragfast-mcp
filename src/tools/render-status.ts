@@ -23,16 +23,20 @@ export async function buildRenderStatusContent(result: ReleaseResult): Promise<C
 
   if (result.status === "completed" && result.images) {
     let tooLargeCount = 0;
+    const markdownLines: string[] = [];
 
     for (const [format, entry] of Object.entries(result.images)) {
       for (const [i, url] of entry.slides.entries()) {
         const ext = url.split("?")[0].split(".").pop() ?? "png";
         const mimeType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+        const name = `${format}-slide-${i}`;
+
+        markdownLines.push(`![${name}](${url})`);
 
         content.push({
           type: "resource_link",
           uri: url,
-          name: `${format}-slide-${i}.${ext}`,
+          name: `${name}.${ext}`,
           mimeType,
           description: entry.dimensions,
           annotations: { audience: ["user"] },
@@ -50,6 +54,15 @@ export async function buildRenderStatusContent(result: ReleaseResult): Promise<C
           tooLargeCount++;
         }
       }
+    }
+
+    if (markdownLines.length > 0) {
+      content.push({
+        type: "text",
+        text:
+          `IMPORTANT: Embed each image inline in your reply using the exact markdown below so the user sees it without expanding the tool card. Do NOT just paste the URL as a link.\n\n` +
+          markdownLines.join("\n"),
+      });
     }
 
     if (tooLargeCount > 0) {

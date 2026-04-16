@@ -297,7 +297,7 @@ export function createBragfastServer({
     {
       title: "Get Render Status",
       description:
-        "Check the status of a render job. Returns status, and image/video URLs when complete. Completed image renders are displayed inline; completed videos are returned as resource links (mimeType `video/mp4`) for the client to render or download.",
+        "Check the status of a render job. Returns status, and image/video URLs when complete. When images are ready, the tool response includes a markdown snippet — you MUST copy that exact `![name](url)` markdown into your reply so the image renders inline in the chat (not hidden behind the tool-result card). Videos are returned as resource links (mimeType `video/mp4`) for the client to render or download.",
       inputSchema: z.object({
         cook_id: z
           .string()

@@ -122,7 +122,7 @@ describe("buildRenderStatusContent", () => {
     const content = await buildRenderStatusContent(baseResult);
 
     const types = content.map((b) => b.type);
-    expect(types).toEqual(["text", "resource_link", "image"]);
+    expect(types).toEqual(["text", "resource_link", "image", "text"]);
 
     const link = content[1] as Extract<typeof content[number], { type: "resource_link" }>;
     expect(link.uri).toBe("https://r2.example.com/cook_xyz/landscape/slide-0.jpg");
@@ -133,6 +133,12 @@ describe("buildRenderStatusContent", () => {
     const img = content[2] as Extract<typeof content[number], { type: "image" }>;
     expect(img.mimeType).toBe("image/png");
     expect(img.data).toBe(Buffer.from("fakepng").toString("base64"));
+
+    const markdown = content[3] as Extract<typeof content[number], { type: "text" }>;
+    expect(markdown.text).toContain(
+      "![landscape-slide-0](https://r2.example.com/cook_xyz/landscape/slide-0.jpg)"
+    );
+    expect(markdown.text).toMatch(/Embed each image inline/);
   });
 
   it("completed image: fetch returns too_large → text + resource_link + explanatory text (no image block)", async () => {
@@ -154,9 +160,12 @@ describe("buildRenderStatusContent", () => {
     const content = await buildRenderStatusContent(baseResult);
 
     const types = content.map((b) => b.type);
-    expect(types).toEqual(["text", "resource_link", "text"]);
+    expect(types).toEqual(["text", "resource_link", "text", "text"]);
 
-    const note = content[2] as Extract<typeof content[number], { type: "text" }>;
+    const markdown = content[2] as Extract<typeof content[number], { type: "text" }>;
+    expect(markdown.text).toMatch(/Embed each image inline/);
+
+    const note = content[3] as Extract<typeof content[number], { type: "text" }>;
     expect(note.text).toMatch(/1 image\(s\) exceeded/);
   });
 
@@ -199,9 +208,21 @@ describe("buildRenderStatusContent", () => {
     const content = await buildRenderStatusContent(result);
 
     const types = content.map((b) => b.type);
-    // text, resource_link, image (slide-0 ok), resource_link, (slide-big too_large), text note
-    expect(types).toEqual(["text", "resource_link", "image", "resource_link", "text"]);
-    const note = content[4] as Extract<typeof content[number], { type: "text" }>;
+    // text, resource_link, image (slide-0 ok), resource_link, (slide-big too_large), markdown text, note text
+    expect(types).toEqual([
+      "text",
+      "resource_link",
+      "image",
+      "resource_link",
+      "text",
+      "text",
+    ]);
+
+    const markdown = content[4] as Extract<typeof content[number], { type: "text" }>;
+    expect(markdown.text).toContain("![landscape-slide-0](https://r2.example.com/slide-0.png)");
+    expect(markdown.text).toContain("![landscape-slide-1](https://r2.example.com/slide-big.png)");
+
+    const note = content[5] as Extract<typeof content[number], { type: "text" }>;
     expect(note.text).toMatch(/1 image\(s\) exceeded/);
   });
 
