@@ -297,12 +297,25 @@ export function createBragfastServer({
     {
       title: "Get Render Status",
       description:
-        "Check the status of a render job. Returns status, and image/video URLs when complete. When images are ready, the tool response includes a markdown snippet — you MUST copy that exact `![name](url)` markdown into your reply so the image renders inline in the chat (not hidden behind the tool-result card). Videos are returned as resource links (mimeType `video/mp4`) for the client to render or download.",
+        "Check the status of a render job. Returns status, and image/video URLs when complete. When images are ready, the tool response includes a markdown snippet — you MUST copy that exact `![name](url)` markdown into your reply so the image renders inline in the chat (not hidden behind the tool-result card). Videos are returned as resource links (mimeType `video/mp4`) for the client to render or download.\n\n" +
+        "Polling strategy (saves tool calls):\n" +
+        "- Images: first call after 30s with wait_seconds=0 (quick %), then wait_seconds=55 if still rendering.\n" +
+        "- Video: first call after 60s with wait_seconds=0 (quick %), then wait_seconds=55 if still rendering. Most videos finish within the second call.\n" +
+        "- If still not done after the long wait, call again with wait_seconds=55 (max 2 extra retries).",
       inputSchema: z.object({
         cook_id: z
           .string()
           .describe(
             "The cook_id returned from generate_release_images or generate_release_video"
+          ),
+        wait_seconds: z
+          .number()
+          .int()
+          .min(0)
+          .max(55)
+          .optional()
+          .describe(
+            "Server-side long-poll: block up to this many seconds (max 55) waiting for the render to reach a terminal status. Default 0 = return immediately. Use 55 on second+ polls to collapse many polls into one tool call."
           ),
       }),
     },
@@ -481,9 +494,10 @@ Show your reasoning and let me confirm or change the choice.
 
 **Important:** The \`formats\` parameter must be a JSON array of objects, not a string.
 
-**Polling rules — renders take time, do NOT poll too fast:**
-- Images: wait 60 seconds before first check, then 30 seconds between retries (max 5 attempts).
-- Video: wait 60 seconds before first check, then 30 seconds between retries (max 8 attempts).
+**Polling rules — use wait_seconds to long-poll and save tool calls:**
+- Images: wait 30s, call \`bragfast_get_render_status\` with \`wait_seconds: 0\` (quick progress check). If still rendering, call again with \`wait_seconds: 55\`. Max 2 extra retries after that.
+- Video: wait 60s, call with \`wait_seconds: 0\` (show user the % progress). If still rendering, call again with \`wait_seconds: 55\` — most videos finish in this window. Max 2 extra retries after that.
+- Never poll faster than every 30s with \`wait_seconds: 0\`.
 
 After results: show the image/video URLs, report credits used and remaining, and offer to generate in other formats or as video/images if I only did one.
 

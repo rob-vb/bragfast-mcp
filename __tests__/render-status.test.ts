@@ -89,6 +89,81 @@ describe("getRenderStatus", () => {
     expect(client.get).toHaveBeenCalledWith("/cook/cook_fail");
     expect(result.status).toBe("failed");
   });
+
+  it("wait_seconds long-polls until terminal status and returns completed", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = makeClient();
+      const pending: ReleaseResult = {
+        cook_id: "cook_wait",
+        output: "video",
+        status: "pending",
+        images: null,
+        credits_used: 0,
+        credits_remaining: 100,
+        created_at: "2026-03-24T00:00:00Z",
+      };
+      const completed: ReleaseResult = { ...pending, status: "completed" };
+      vi.mocked(client.get)
+        .mockResolvedValueOnce(pending)
+        .mockResolvedValueOnce(completed);
+
+      const promise = getRenderStatus(client, { cook_id: "cook_wait", wait_seconds: 55 });
+      await vi.advanceTimersByTimeAsync(35000);
+      const result = await promise;
+
+      expect(result.status).toBe("completed");
+      expect(client.get).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("wait_seconds returns latest non-terminal result when deadline elapses", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = makeClient();
+      const pending: ReleaseResult = {
+        cook_id: "cook_slow",
+        output: "video",
+        status: "pending",
+        images: null,
+        credits_used: 0,
+        credits_remaining: 100,
+        created_at: "2026-03-24T00:00:00Z",
+      };
+      vi.mocked(client.get).mockResolvedValue(pending);
+
+      const promise = getRenderStatus(client, { cook_id: "cook_slow", wait_seconds: 55 });
+      await vi.advanceTimersByTimeAsync(60000);
+      const result = await promise;
+
+      expect(result.status).toBe("pending");
+      // deadline=55s, interval=30s → 2 calls at t=0,30; next sleep would exceed deadline
+      expect(client.get).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("wait_seconds=0 performs a single call (no long-poll)", async () => {
+    const client = makeClient();
+    const pending: ReleaseResult = {
+      cook_id: "cook_quick",
+      output: "video",
+      status: "pending",
+      images: null,
+      credits_used: 0,
+      credits_remaining: 100,
+      created_at: "2026-03-24T00:00:00Z",
+    };
+    vi.mocked(client.get).mockResolvedValue(pending);
+
+    const result = await getRenderStatus(client, { cook_id: "cook_quick", wait_seconds: 0 });
+
+    expect(result.status).toBe("pending");
+    expect(client.get).toHaveBeenCalledOnce();
+  });
 });
 
 describe("buildRenderStatusContent", () => {

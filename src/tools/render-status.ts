@@ -4,6 +4,7 @@ import type { ReleaseResult } from "../lib/types.js";
 
 export interface RenderStatusInput {
   cook_id: string;
+  wait_seconds?: number;
 }
 
 export type ContentBlock =
@@ -11,11 +12,27 @@ export type ContentBlock =
   | { type: "image"; data: string; mimeType: string; annotations?: { audience: ("user" | "assistant")[] } }
   | { type: "resource_link"; uri: string; name: string; mimeType: string; description?: string; annotations?: { audience: ("user" | "assistant")[] } };
 
+const MAX_WAIT_SECONDS = 55;
+const POLL_INTERVAL_MS = 30000;
+
+function isTerminal(status: ReleaseResult["status"]): boolean {
+  return status === "completed" || status === "failed" || status === "dismissed";
+}
+
 export async function getRenderStatus(
   client: BragfastApiClient,
   input: RenderStatusInput
 ): Promise<ReleaseResult> {
-  return client.get<ReleaseResult>(`/cook/${input.cook_id}`);
+  const path = `/cook/${input.cook_id}`;
+  const wait = Math.max(0, Math.min(input.wait_seconds ?? 0, MAX_WAIT_SECONDS));
+  const deadline = Date.now() + wait * 1000;
+
+  let result = await client.get<ReleaseResult>(path);
+  while (!isTerminal(result.status) && Date.now() + POLL_INTERVAL_MS <= deadline) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    result = await client.get<ReleaseResult>(path);
+  }
+  return result;
 }
 
 export async function buildRenderStatusContent(result: ReleaseResult): Promise<ContentBlock[]> {
