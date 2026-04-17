@@ -20,7 +20,7 @@ const baseResult: ReleaseResult = {
 };
 
 describe("generateImages", () => {
-  it("calls POST /cook with input and returns result", async () => {
+  it("calls POST /cook/image with input and returns result", async () => {
     const client = makeClient();
     vi.mocked(client.post).mockResolvedValue(baseResult);
 
@@ -31,7 +31,7 @@ describe("generateImages", () => {
     const result = await generateImages(client, input);
 
     expect(client.post).toHaveBeenCalledOnce();
-    expect(client.post).toHaveBeenCalledWith("/cook", input);
+    expect(client.post).toHaveBeenCalledWith("/cook/image", input);
     expect(result).toEqual(baseResult);
   });
 
@@ -64,6 +64,6 @@ describe("generateImages", () => {
 
     await generateImages(client, input);
 
-    expect(client.post).toHaveBeenCalledWith("/cook", input);
+    expect(client.post).toHaveBeenCalledWith("/cook/image", input);
   });
 });

@@ -11,5 +11,5 @@ export async function generateVideo(
   input: GenerateVideoInput
 ): Promise<ReleaseResult> {
   const body = { ...input, video: input.video ?? true };
-  return client.post<ReleaseResult>("/cook", body);
+  return client.post<ReleaseResult>("/cook/video", body);
 }

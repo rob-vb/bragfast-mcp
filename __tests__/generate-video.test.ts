@@ -20,7 +20,7 @@ const baseResult: ReleaseResult = {
 };
 
 describe("generateVideo", () => {
-  it("calls POST /cook with video field", async () => {
+  it("calls POST /cook/video with video field", async () => {
     const client = makeClient();
     vi.mocked(client.post).mockResolvedValue(baseResult);
 
@@ -31,7 +31,7 @@ describe("generateVideo", () => {
 
     const result = await generateVideo(client, input);
 
-    expect(client.post).toHaveBeenCalledWith("/cook", {
+    expect(client.post).toHaveBeenCalledWith("/cook/video", {
       ...input,
       video: { duration: 10 },
     });

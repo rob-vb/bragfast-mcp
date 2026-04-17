@@ -34,5 +34,5 @@ export async function generateImages(
   client: BragfastApiClient,
   input: GenerateImagesInput
 ): Promise<ReleaseResult> {
-  return client.post<ReleaseResult>("/cook", input);
+  return client.post<ReleaseResult>("/cook/image", input);
 }
