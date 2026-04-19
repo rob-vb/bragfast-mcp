@@ -10,6 +10,15 @@ import { getRenderStatus, buildRenderStatusContent } from "./tools/render-status
 import { uploadImage } from "./tools/upload-image.js";
 import { getUploadUrl } from "./tools/get-upload-url.js";
 import { startCook } from "./tools/start-cook.js";
+import {
+  listDrafts,
+  getDraft,
+  approveDraft,
+  dismissDraft,
+  updateDraftCopy,
+  promoteDraftToVideo,
+  type DraftStatus,
+} from "./tools/drafts.js";
 
 export function createBragfastServer({
   apiClient,
@@ -494,6 +503,179 @@ export function createBragfastServer({
         };
       }
     }
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // DRAFTS (agent-drafted brag posts)
+  //
+  // brag.fast runs a daily cron that reads the user's watched GitHub repos,
+  // picks one brag-worthy commit with Haiku, and drops a pending draft into
+  // their account. These tools let an agent review, edit, and approve those
+  // drafts on the user's behalf. The final "post to social" step remains
+  // human — these tools never publish.
+  // ─────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "bragfast_list_drafts",
+    {
+      title: "List Drafts",
+      description:
+        "List agent-drafted brag posts waiting for approval. Optional status filter (pending_review is the most useful). Returns copy, source repo/commit, suggested template+format, and status for each.",
+      inputSchema: z.object({
+        status: z
+          .enum(["pending_review", "approved", "dismissed", "expired", "error"])
+          .optional()
+          .describe("Filter by status (default: pending_review)"),
+        limit: z.number().int().min(1).max(200).optional(),
+      }),
+    },
+    async (input) => {
+      try {
+        const status: DraftStatus = input.status ?? "pending_review";
+        const drafts = await listDrafts(apiClient, { status, limit: input.limit });
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(drafts, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "bragfast_get_draft",
+    {
+      title: "Get Draft",
+      description:
+        "Fetch a single draft by ID. Returns full content including the originally generated copy (useful for showing the user what Haiku wrote vs what they edited).",
+      inputSchema: z.object({
+        draft_id: z.string().describe("Draft ID returned by bragfast_list_drafts"),
+      }),
+    },
+    async (input) => {
+      try {
+        const draft = await getDraft(apiClient, input.draft_id);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(draft, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "bragfast_update_draft_copy",
+    {
+      title: "Update Draft Copy",
+      description:
+        "Rewrite the draft tweet copy before approval. 1-280 chars. Fails if the draft is already approved or dismissed.",
+      inputSchema: z.object({
+        draft_id: z.string(),
+        copy: z.string().min(1).max(280),
+      }),
+    },
+    async (input) => {
+      try {
+        await updateDraftCopy(apiClient, input.draft_id, input.copy);
+        return { content: [{ type: "text" as const, text: "Draft copy updated." }] };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "bragfast_approve_draft",
+    {
+      title: "Approve Draft",
+      description:
+        "Approve a draft and kick off the image render. Use bragfast_get_render_status with the returned cook_id to poll. Optional edited_copy lets you tweak the tweet in the same call.",
+      inputSchema: z.object({
+        draft_id: z.string(),
+        edited_copy: z
+          .string()
+          .min(1)
+          .max(280)
+          .optional()
+          .describe("If present, replaces the draft copy before approval."),
+        upload_id: z
+          .string()
+          .optional()
+          .describe(
+            "Optional upload ID (from bragfast_upload_image) to attach a user-provided screenshot to the draft before rendering.",
+          ),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await approveDraft(apiClient, input.draft_id, {
+          editedCopy: input.edited_copy,
+          uploadId: input.upload_id,
+        });
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "bragfast_dismiss_draft",
+    {
+      title: "Dismiss Draft",
+      description:
+        "Dismiss a draft without rendering. Use when Haiku's pick isn't worth posting. The underlying commit won't be re-drafted today (dedup), but tomorrow's cron is unaffected.",
+      inputSchema: z.object({ draft_id: z.string() }),
+    },
+    async (input) => {
+      try {
+        await dismissDraft(apiClient, input.draft_id);
+        return { content: [{ type: "text" as const, text: "Draft dismissed." }] };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "bragfast_promote_draft_to_video",
+    {
+      title: "Promote Draft to Video",
+      description:
+        "After a draft is approved, upgrade it to a showcase video using the same copy and template. Idempotent — calling twice returns the existing video cook_id without charging again. Separate credit charge from the image.",
+      inputSchema: z.object({ draft_id: z.string() }),
+    },
+    async (input) => {
+      try {
+        const result = await promoteDraftToVideo(apiClient, input.draft_id);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
   );
 
   // Guided workflow prompt — for Claude Desktop, Claude.ai, and other MCP clients

@@ -84,6 +84,24 @@ export class BragfastApiClient {
     return handleResponse<T>(res);
   }
 
+  async patch<T>(path: string, body: unknown): Promise<T> {
+    const apiKey = await this.resolveKey();
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error("Cannot reach Bragfast API. Check your internet connection.");
+    }
+    return handleResponse<T>(res);
+  }
+
   async putRaw<T>(path: string, body: Uint8Array, contentType: string): Promise<T> {
     const apiKey = await this.resolveKey();
     let res: Response;
