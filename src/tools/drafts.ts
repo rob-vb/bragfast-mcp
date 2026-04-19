@@ -80,3 +80,54 @@ export async function promoteDraftToVideo(
     {},
   );
 }
+
+export type DraftSkipReason = "dedup" | "no-commits" | "not-worth-posting";
+
+export type CreateDraftFromCommitsInput = {
+  repoFullName: string;
+  windowStartMs?: number;
+  windowEndMs?: number;
+};
+
+export type CreateDraftFromCommitsResult =
+  | { id: string; status: "pending_review" }
+  | { skipped: DraftSkipReason; reasoning?: string };
+
+/**
+ * Shape A — one-call convenience. brag.fast fetches commits via its GitHub App,
+ * runs the Haiku pipeline, and inserts a draft. Use when you don't have your
+ * own GitHub MCP. For full agent control, use createDraft + the ai_* tools.
+ */
+export async function createDraftFromCommits(
+  client: BragfastApiClient,
+  input: CreateDraftFromCommitsInput,
+): Promise<CreateDraftFromCommitsResult> {
+  return client.post<CreateDraftFromCommitsResult>("/drafts/from-commits", input);
+}
+
+export type CreateDraftInput = {
+  copy: string;
+  templateId: string;
+  format: "landscape" | "square" | "portrait";
+  aiContent: unknown[];
+  repoFullName?: string;
+  sourceCommitShas?: string[];
+  windowStartMs?: number;
+  windowEndMs?: number;
+};
+
+export type CreateDraftResult =
+  | { id: string; status: "pending_review" }
+  | { skipped: DraftSkipReason };
+
+/**
+ * Shape B — raw create. Agent supplies pre-filled copy + template + objects.
+ * Pair with bragfast_ai_suggest_template + bragfast_ai_fill_template_objects
+ * to build the inputs, or supply them yourself.
+ */
+export async function createDraft(
+  client: BragfastApiClient,
+  input: CreateDraftInput,
+): Promise<CreateDraftResult> {
+  return client.post<CreateDraftResult>("/drafts", input);
+}

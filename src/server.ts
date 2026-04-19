@@ -17,8 +17,15 @@ import {
   dismissDraft,
   updateDraftCopy,
   promoteDraftToVideo,
+  createDraftFromCommits,
+  createDraft,
   type DraftStatus,
 } from "./tools/drafts.js";
+import {
+  analyzeCommits,
+  suggestTemplate,
+  fillTemplateObjects,
+} from "./tools/ai.js";
 
 export function createBragfastServer({
   apiClient,
@@ -508,11 +515,22 @@ export function createBragfastServer({
   // ─────────────────────────────────────────────────────────────
   // DRAFTS (agent-drafted brag posts)
   //
-  // brag.fast runs a daily cron that reads the user's watched GitHub repos,
-  // picks one brag-worthy commit with Haiku, and drops a pending draft into
-  // their account. These tools let an agent review, edit, and approve those
-  // drafts on the user's behalf. The final "post to social" step remains
-  // human — these tools never publish.
+  // brag.fast = agent rail. Two front doors for creating drafts:
+  //
+  //   Shape A (one-call):  bragfast_draft_from_recent_commits
+  //     brag.fast holds the GitHub App, runs the full Haiku pipeline.
+  //     Use when you don't have your own GitHub MCP.
+  //
+  //   Shape B (primitives): bragfast_ai_analyze_commits
+  //                       + bragfast_ai_suggest_template
+  //                       + bragfast_ai_fill_template_objects
+  //                       + bragfast_create_draft
+  //     Agent owns orchestration. Use your own GitHub MCP to fetch commits,
+  //     then call brag.fast for AI helpers + raw draft create.
+  //
+  // Both produce the same draft row. The list/get/update/approve/dismiss/
+  // promote-to-video tools below are shared. The final "post to social" step
+  // remains human — these tools never publish.
   // ─────────────────────────────────────────────────────────────
 
   server.registerTool(
@@ -639,7 +657,7 @@ export function createBragfastServer({
     {
       title: "Dismiss Draft",
       description:
-        "Dismiss a draft without rendering. Use when Haiku's pick isn't worth posting. The underlying commit won't be re-drafted today (dedup), but tomorrow's cron is unaffected.",
+        "Dismiss a draft without rendering. Use when the pick isn't worth posting. The underlying commit won't be re-drafted in the same time window (dedup) but later windows are unaffected.",
       inputSchema: z.object({ draft_id: z.string() }),
     },
     async (input) => {
@@ -666,6 +684,207 @@ export function createBragfastServer({
     async (input) => {
       try {
         const result = await promoteDraftToVideo(apiClient, input.draft_id);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // Shape A — one-call draft creation
+  // ─────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "bragfast_draft_from_recent_commits",
+    {
+      title: "Draft from Recent Commits",
+      description:
+        "One-call draft creation. brag.fast fetches recent commits for the given repo (using its GitHub App installation), runs the Haiku pipeline, and inserts a pending draft. Returns the draft id, or {skipped: 'no-commits' | 'not-worth-posting' | 'dedup'}. Repo must be in the user's watched list (installed brag.fast GitHub App). Use this when you don't have your own GitHub MCP.",
+      inputSchema: z.object({
+        repo_full_name: z
+          .string()
+          .describe("owner/name format, e.g. rob-vb/bragfast. Must be in user's watched list."),
+        window_start_ms: z
+          .number()
+          .int()
+          .optional()
+          .describe("Start of commit window in ms epoch. Defaults to start of current UTC day."),
+        window_end_ms: z.number().int().optional().describe("End of commit window. Defaults to now."),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await createDraftFromCommits(apiClient, {
+          repoFullName: input.repo_full_name,
+          windowStartMs: input.window_start_ms,
+          windowEndMs: input.window_end_ms,
+        });
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // Shape B — AI primitives + raw draft create
+  // ─────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "bragfast_ai_analyze_commits",
+    {
+      title: "Analyze Commits (is it worth posting?)",
+      description:
+        "Run brag.fast's brag-post taste model over a list of commits. Returns {worthPosting, chosenCommitSha, draftCopy} or {worthPosting: false, reasoning}. Use when your agent fetched commits via its own GitHub MCP and wants brag.fast's opinion before drafting. The prompt is tuned for indie-hacker brag posts (skips chores, picks user-visible features).",
+      inputSchema: z.object({
+        repo_full_name: z.string(),
+        commits: z
+          .array(
+            z.object({
+              sha: z.string(),
+              message: z.string(),
+            }),
+          )
+          .describe("Commits to evaluate. brag.fast picks at most one."),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await analyzeCommits(apiClient, {
+          repoFullName: input.repo_full_name,
+          commits: input.commits,
+        });
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "bragfast_ai_suggest_template",
+    {
+      title: "Suggest Template",
+      description:
+        "Pick the best template + format for a piece of draft copy. If candidates omitted, brag.fast loads the user's full template set (built-ins + custom). Returns {templateId, format, reasoning}.",
+      inputSchema: z.object({
+        copy: z.string().min(1).max(280).describe("The drafted social media copy."),
+        formats: z
+          .array(z.enum(["landscape", "square", "portrait"]))
+          .optional()
+          .describe("Available formats. Defaults to [landscape]."),
+        candidates: z
+          .array(
+            z.object({
+              id: z.string(),
+              name: z.string(),
+              tags: z.array(z.string()).optional(),
+              description: z.string().optional(),
+            }),
+          )
+          .optional()
+          .describe("Optional. Omit to use the user's templates server-side."),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await suggestTemplate(apiClient, input);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "bragfast_ai_fill_template_objects",
+    {
+      title: "Fill Template Objects",
+      description:
+        "Generate the per-slot text content for a chosen template + format. brag.fast loads the template, extracts text slots, and asks Haiku to fill them. Returns {objects: [{id, text}]} ready to pass to bragfast_create_draft.",
+      inputSchema: z.object({
+        template_id: z.string(),
+        format: z.enum(["landscape", "square", "portrait"]),
+        context: z.object({
+          draft_copy: z.string().describe("The drafted social media copy."),
+          commit_message: z.string().optional().describe("Optional source commit message for extra context."),
+        }),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await fillTemplateObjects(apiClient, {
+          templateId: input.template_id,
+          format: input.format,
+          context: {
+            draftCopy: input.context.draft_copy,
+            commitMessage: input.context.commit_message,
+          },
+        });
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "bragfast_create_draft",
+    {
+      title: "Create Draft",
+      description:
+        "Create a draft from pre-filled inputs. Use after bragfast_ai_suggest_template + bragfast_ai_fill_template_objects (or supply them yourself). Returns {id, status: 'pending_review'} or {skipped: 'dedup'}. The draft appears in the user's /admin/drafts review queue.",
+      inputSchema: z.object({
+        copy: z.string().min(1).max(280),
+        template_id: z.string(),
+        format: z.enum(["landscape", "square", "portrait"]),
+        ai_content: z
+          .array(z.unknown())
+          .describe("Object modifications array, e.g. [{id:'title', text:'...'}]. Get from bragfast_ai_fill_template_objects."),
+        repo_full_name: z.string().optional().describe("Optional dedup hint."),
+        source_commit_shas: z.array(z.string()).optional().describe("Optional dedup hint."),
+        window_start_ms: z.number().int().optional(),
+        window_end_ms: z.number().int().optional(),
+      }),
+    },
+    async (input) => {
+      try {
+        const result = await createDraft(apiClient, {
+          copy: input.copy,
+          templateId: input.template_id,
+          format: input.format,
+          aiContent: input.ai_content,
+          repoFullName: input.repo_full_name,
+          sourceCommitShas: input.source_commit_shas,
+          windowStartMs: input.window_start_ms,
+          windowEndMs: input.window_end_ms,
+        });
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         };
