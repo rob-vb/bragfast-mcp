@@ -1,70 +1,100 @@
 import { describe, it, expect, vi } from "vitest";
 import { BragfastApiClient } from "../src/lib/api-client.js";
-import { createDraftFromCommits, createDraft } from "../src/tools/drafts.js";
+import {
+  createDraft,
+  listDrafts,
+  getDraft,
+  deleteDraft,
+} from "../src/tools/drafts.js";
 
 function makeClient() {
   const client = new BragfastApiClient("https://test.brag.fast/api/v1");
   client.post = vi.fn();
+  client.get = vi.fn();
+  client.delete = vi.fn();
   return client;
 }
 
-describe("createDraftFromCommits (Shape A)", () => {
-  it("POSTs /drafts/from-commits with input and returns draft", async () => {
+describe("createDraft", () => {
+  it("POSTs /drafts with input and returns the created draft", async () => {
     const client = makeClient();
-    vi.mocked(client.post).mockResolvedValue({ id: "d_1", status: "pending_review" });
+    vi.mocked(client.post).mockResolvedValue({ id: "d_1" });
 
-    const result = await createDraftFromCommits(client, {
-      repoFullName: "rob-vb/bragfast",
-    });
+    const input = {
+      output: "image" as const,
+      name: "My Draft",
+      templateId: "split-browser",
+      formats: ["landscape" as const],
+      objectContent: { title: { text: "Foo" } },
+    };
+    const result = await createDraft(client, input);
 
-    expect(client.post).toHaveBeenCalledWith("/drafts/from-commits", {
-      repoFullName: "rob-vb/bragfast",
-    });
-    expect(result).toEqual({ id: "d_1", status: "pending_review" });
+    expect(client.post).toHaveBeenCalledWith("/drafts", input);
+    expect(result).toEqual({ id: "d_1" });
   });
 
-  it("passes through skipped responses without throwing", async () => {
+  it("forwards video-output drafts unchanged", async () => {
     const client = makeClient();
-    vi.mocked(client.post).mockResolvedValue({ skipped: "dedup" });
+    vi.mocked(client.post).mockResolvedValue({ id: "d_2" });
 
-    const result = await createDraftFromCommits(client, { repoFullName: "rob-vb/bragfast" });
+    const input = {
+      output: "video" as const,
+      video: { duration: 8, preset: "showcase" },
+    };
+    const result = await createDraft(client, input);
 
-    expect(result).toEqual({ skipped: "dedup" });
+    expect(client.post).toHaveBeenCalledWith("/drafts", input);
+    expect(result).toEqual({ id: "d_2" });
   });
 });
 
-describe("createDraft (Shape B)", () => {
-  it("POSTs /drafts with full body and returns draft", async () => {
+describe("listDrafts", () => {
+  it("GETs /drafts and returns the array", async () => {
     const client = makeClient();
-    vi.mocked(client.post).mockResolvedValue({ id: "d_2", status: "pending_review" });
+    const drafts = [
+      {
+        id: "d_1",
+        name: null,
+        source: "agent",
+        created_at: "2026-04-20T00:00:00Z",
+        config: { output: "image" },
+      },
+    ];
+    vi.mocked(client.get).mockResolvedValue(drafts);
 
-    const result = await createDraft(client, {
-      copy: "shipped foo",
-      templateId: "split-browser",
-      format: "landscape",
-      aiContent: [{ id: "title", text: "Foo" }],
-    });
+    const result = await listDrafts(client);
 
-    expect(client.post).toHaveBeenCalledWith("/drafts", {
-      copy: "shipped foo",
-      templateId: "split-browser",
-      format: "landscape",
-      aiContent: [{ id: "title", text: "Foo" }],
-    });
-    expect(result).toEqual({ id: "d_2", status: "pending_review" });
+    expect(client.get).toHaveBeenCalledWith("/drafts");
+    expect(result).toEqual(drafts);
   });
+});
 
-  it("passes through skipped responses without throwing", async () => {
+describe("getDraft", () => {
+  it("GETs /drafts/:id with the id URL-encoded", async () => {
     const client = makeClient();
-    vi.mocked(client.post).mockResolvedValue({ skipped: "dedup" });
+    const draft = {
+      id: "d 1",
+      name: null,
+      source: "user",
+      created_at: "2026-04-20T00:00:00Z",
+      config: { output: "image" },
+    };
+    vi.mocked(client.get).mockResolvedValue(draft);
 
-    const result = await createDraft(client, {
-      copy: "x",
-      templateId: "t",
-      format: "landscape",
-      aiContent: [],
-    });
+    const result = await getDraft(client, "d 1");
 
-    expect(result).toEqual({ skipped: "dedup" });
+    expect(client.get).toHaveBeenCalledWith("/drafts/d%201");
+    expect(result).toEqual(draft);
+  });
+});
+
+describe("deleteDraft", () => {
+  it("DELETEs /drafts/:id with the id URL-encoded", async () => {
+    const client = makeClient();
+    vi.mocked(client.delete).mockResolvedValue(undefined);
+
+    await deleteDraft(client, "d/1");
+
+    expect(client.delete).toHaveBeenCalledWith("/drafts/d%2F1");
   });
 });
