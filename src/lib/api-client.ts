@@ -136,6 +136,24 @@ export class BragfastApiClient {
     return handleResponse<T>(res);
   }
 
+  async delete(path: string): Promise<void> {
+    const apiKey = await this.resolveKey();
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+    } catch {
+      throw new Error("Cannot reach Bragfast API. Check your internet connection.");
+    }
+    if (!res.ok && res.status !== 404) {
+      await handleResponse<never>(res);
+    }
+  }
+
   async postMultipart<T>(path: string, formData: FormData): Promise<T> {
     const apiKey = await this.resolveKey();
     let res: Response;
