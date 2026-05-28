@@ -375,7 +375,7 @@ export function createBragfastServer({
     {
       title: "Get Render Status",
       description:
-        "Check the status of a render job. Returns status, and image/video URLs when complete. When images are ready, the tool response includes a markdown snippet — you MUST copy that exact `![name](url)` markdown into your reply so the image renders inline in the chat (not hidden behind the tool-result card). Videos are returned as resource links (mimeType `video/mp4`) for the client to render or download.\n\n" +
+        "Check the status of a render job. When complete, returns a trimmed status summary plus MCP image content blocks (audience: user) for inline preview in Claude Code and claude.ai, and resource_link blocks with stable download URLs. Open preview_page in the summary for the full gallery in brag.fast.\n\n" +
         "Polling strategy — use the `wait_seconds` parameter to long-poll server-side. NEVER use a shell `sleep` or `Bash` timer to wait between polls; the `wait_seconds` value IS the wait.\n" +
         "- Images: first call with wait_seconds=10 (usually done). If still rendering, call again with wait_seconds=55.\n" +
         "- Video: first call with wait_seconds=55. If still rendering, call again with wait_seconds=55. Most videos finish within the second call.\n" +
@@ -745,7 +745,7 @@ Show your reasoning and let me confirm or change the choice.
 - Images: call \`bragfast_get_render_status\` with \`wait_seconds: 10\` (images usually finish fast). If still rendering, call again with \`wait_seconds: 55\`. Max 2 extra retries after that.
 - Video: call with \`wait_seconds: 55\`. If still rendering, call again with \`wait_seconds: 55\` — most videos finish in this window. Max 2 extra retries after that.
 
-After results: show the image/video URLs, report credits used and remaining, and offer to generate in other formats or as video/images if I only did one.
+After results: confirm status and credits. Inline previews arrive as MCP image blocks in the tool result; direct URLs are in resource_link blocks. Offer to generate in other formats or as video/images if I only did one.
 
 ## Error Handling
 

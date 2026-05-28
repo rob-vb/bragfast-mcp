@@ -112,7 +112,7 @@ Environment variables:
 | `PORT` | `3000` | Port to listen on |
 | `BASE_URL` | `http://localhost:3000` | Public URL (used in OAuth metadata) |
 | `BRAGFAST_API_URL` | `https://brag.fast/api/v1` | Bragfast API base URL |
-| `OAUTH_CLIENTS_FILE` | `./data/clients.json` | Path to persist OAuth clients |
+| `OAUTH_CLIENTS_FILE` | `./data/clients.json` (dev) · `/tmp/bragfast-oauth/clients.json` (production) | Path to persist OAuth clients. If the path is not writable, clients stay in memory for the process lifetime. |
 
 Use nginx or Caddy as a reverse proxy for HTTPS. Manage the process with `pm2` or `systemd`.
 

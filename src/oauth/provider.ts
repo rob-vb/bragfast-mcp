@@ -49,11 +49,19 @@ class BragfastClientsStore implements OAuthRegisteredClientsStore {
   }
 
   private async persist(): Promise<void> {
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(
-      this.filePath,
-      JSON.stringify([...this.clients.values()], null, 2)
-    );
+    try {
+      await mkdir(dirname(this.filePath), { recursive: true });
+      await writeFile(
+        this.filePath,
+        JSON.stringify([...this.clients.values()], null, 2)
+      );
+    } catch (err) {
+      // Hosted deploys often have a read-only app dir; registration must still succeed in-memory.
+      console.warn(
+        `[oauth] Could not persist clients to ${this.filePath}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 
   async getClient(
@@ -64,13 +72,14 @@ class BragfastClientsStore implements OAuthRegisteredClientsStore {
   }
 
   async registerClient(
-    metadata: Omit<OAuthClientInformationFull, "client_id" | "client_id_issued_at">
+    metadata: OAuthClientInformationFull
   ): Promise<OAuthClientInformationFull> {
     await this.ensureLoaded();
     const client: OAuthClientInformationFull = {
       ...metadata,
-      client_id: randomBytes(16).toString("hex"),
-      client_id_issued_at: Math.floor(Date.now() / 1000),
+      client_id: metadata.client_id ?? randomBytes(16).toString("hex"),
+      client_id_issued_at:
+        metadata.client_id_issued_at ?? Math.floor(Date.now() / 1000),
     };
     this.clients.set(client.client_id, client);
     await this.persist();

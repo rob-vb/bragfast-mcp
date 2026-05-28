@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { BragfastApiClient } from "../src/lib/api-client.js";
-import { getRenderStatus, buildRenderStatusContent } from "../src/tools/render-status.js";
+import {
+  getRenderStatus,
+  buildRenderStatusContent,
+  summarizeReleaseResult,
+} from "../src/tools/render-status.js";
 import type { ReleaseResult } from "../src/lib/types.js";
 
 function makeClient() {
@@ -139,7 +143,6 @@ describe("getRenderStatus", () => {
       const result = await promise;
 
       expect(result.status).toBe("pending");
-      // deadline=55s, interval=30s → 2 calls at t=0,30; next sleep would exceed deadline
       expect(client.get).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
@@ -166,6 +169,47 @@ describe("getRenderStatus", () => {
   });
 });
 
+describe("summarizeReleaseResult", () => {
+  const baseResult: ReleaseResult = {
+    cook_id: "cook_xyz",
+    output: "image",
+    status: "completed",
+    images: {
+      landscape: {
+        slides: ["https://r2.example.com/cook_xyz/landscape/slide-0.jpg"],
+        dimensions: "1200x675",
+      },
+    },
+    credits_used: 2,
+    credits_remaining: 98,
+    created_at: "2026-03-24T00:00:00Z",
+    completed_at: "2026-03-24T00:00:05Z",
+    metadata: "should-not-leak",
+    webhook_url: "https://example.com/hook",
+  };
+
+  it("omits metadata and webhook_url from the summary", () => {
+    const summary = summarizeReleaseResult(baseResult);
+    expect(summary).not.toHaveProperty("metadata");
+    expect(summary).not.toHaveProperty("webhook_url");
+    expect(summary).not.toHaveProperty("created_at");
+    expect(summary.cook_id).toBe("cook_xyz");
+    expect(summary.preview_page).toBe(
+      "https://brag.fast/admin/history?id=cook_xyz",
+    );
+  });
+
+  it("includes trimmed image urls by format", () => {
+    const summary = summarizeReleaseResult(baseResult);
+    expect(summary.images).toEqual({
+      landscape: {
+        dimensions: "1200x675",
+        urls: ["https://r2.example.com/cook_xyz/landscape/slide-0.jpg"],
+      },
+    });
+  });
+});
+
 describe("buildRenderStatusContent", () => {
   const baseResult: ReleaseResult = {
     cook_id: "cook_xyz",
@@ -183,40 +227,53 @@ describe("buildRenderStatusContent", () => {
     completed_at: "2026-03-24T00:00:05Z",
   };
 
-  it("pending result emits only a text block", async () => {
+  it("pending result emits only a trimmed summary text block", async () => {
     const pending: ReleaseResult = { ...baseResult, status: "pending", images: null };
     const content = await buildRenderStatusContent(pending);
 
     expect(content).toHaveLength(1);
     expect(content[0].type).toBe("text");
+    const parsed = JSON.parse((content[0] as { text: string }).text);
+    expect(parsed.status).toBe("pending");
+    expect(parsed.preview_page).toContain("cook_xyz");
+    expect(parsed).not.toHaveProperty("images");
   });
 
-  it("completed image: fetch succeeds → text + resource_link + image blocks", async () => {
+  it("completed image: fetch succeeds → summary + image + resource_link", async () => {
     vi.stubGlobal("fetch", fakeImageFetch());
 
     const content = await buildRenderStatusContent(baseResult);
 
     const types = content.map((b) => b.type);
-    expect(types).toEqual(["text", "resource_link", "image", "text"]);
+    expect(types).toEqual(["text", "image", "resource_link"]);
 
-    const link = content[1] as Extract<typeof content[number], { type: "resource_link" }>;
+    const summary = JSON.parse((content[0] as { text: string }).text);
+    expect(summary.images.landscape.urls).toHaveLength(1);
+
+    const img = content[1] as Extract<(typeof content)[number], { type: "image" }>;
+    expect(img.mimeType).toBe("image/png");
+    expect(img.data).toBe(Buffer.from("fakepng").toString("base64"));
+    expect(img.annotations?.audience).toEqual(["user"]);
+
+    const link = content[2] as Extract<(typeof content)[number], { type: "resource_link" }>;
     expect(link.uri).toBe("https://r2.example.com/cook_xyz/landscape/slide-0.jpg");
     expect(link.name).toBe("landscape-slide-0.jpg");
     expect(link.mimeType).toBe("image/jpeg");
-    expect(link.description).toBe("1200x675");
-
-    const img = content[2] as Extract<typeof content[number], { type: "image" }>;
-    expect(img.mimeType).toBe("image/png");
-    expect(img.data).toBe(Buffer.from("fakepng").toString("base64"));
-
-    const markdown = content[3] as Extract<typeof content[number], { type: "text" }>;
-    expect(markdown.text).toContain(
-      "![landscape-slide-0](https://r2.example.com/cook_xyz/landscape/slide-0.jpg)"
-    );
-    expect(markdown.text).toMatch(/Embed each image inline/);
+    expect(link.annotations?.audience).toEqual(["user"]);
   });
 
-  it("completed image: fetch returns too_large → text + resource_link + explanatory text (no image block)", async () => {
+  it("does not emit markdown paste instructions", async () => {
+    vi.stubGlobal("fetch", fakeImageFetch());
+    const content = await buildRenderStatusContent(baseResult);
+    const allText = content
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { text: string }).text)
+      .join("\n");
+    expect(allText).not.toMatch(/Embed each image inline/);
+    expect(allText).not.toMatch(/!\[.*\]\(/);
+  });
+
+  it("completed image: fetch returns too_large → summary + resource_link + note", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -229,19 +286,17 @@ describe("buildRenderStatusContent", () => {
           },
         },
         arrayBuffer: async () => new ArrayBuffer(0),
-      })
+      }),
     );
 
     const content = await buildRenderStatusContent(baseResult);
 
     const types = content.map((b) => b.type);
-    expect(types).toEqual(["text", "resource_link", "text", "text"]);
+    expect(types).toEqual(["text", "resource_link", "text"]);
 
-    const markdown = content[2] as Extract<typeof content[number], { type: "text" }>;
-    expect(markdown.text).toMatch(/Embed each image inline/);
-
-    const note = content[3] as Extract<typeof content[number], { type: "text" }>;
+    const note = content[2] as Extract<(typeof content)[number], { type: "text" }>;
     expect(note.text).toMatch(/1 image\(s\) exceeded/);
+    expect(note.text).toContain("admin/history?id=cook_xyz");
   });
 
   it("completed image: mixed results emit inline for success and resource_link for both", async () => {
@@ -277,31 +332,25 @@ describe("buildRenderStatusContent", () => {
           },
           arrayBuffer: async () => new ArrayBuffer(0),
         });
-      })
+      }),
     );
 
     const content = await buildRenderStatusContent(result);
 
     const types = content.map((b) => b.type);
-    // text, resource_link, image (slide-0 ok), resource_link, (slide-big too_large), markdown text, note text
     expect(types).toEqual([
       "text",
-      "resource_link",
       "image",
       "resource_link",
-      "text",
+      "resource_link",
       "text",
     ]);
 
-    const markdown = content[4] as Extract<typeof content[number], { type: "text" }>;
-    expect(markdown.text).toContain("![landscape-slide-0](https://r2.example.com/slide-0.png)");
-    expect(markdown.text).toContain("![landscape-slide-1](https://r2.example.com/slide-big.png)");
-
-    const note = content[5] as Extract<typeof content[number], { type: "text" }>;
+    const note = content[4] as Extract<(typeof content)[number], { type: "text" }>;
     expect(note.text).toMatch(/1 image\(s\) exceeded/);
   });
 
-  it("completed video with poster_url → poster image block + video resource_link", async () => {
+  it("completed video with poster_url → summary + poster image + video resource_link", async () => {
     const result: ReleaseResult = {
       ...baseResult,
       output: "video",
@@ -322,16 +371,16 @@ describe("buildRenderStatusContent", () => {
     const types = content.map((b) => b.type);
     expect(types).toEqual(["text", "image", "resource_link"]);
 
-    const img = content[1] as Extract<typeof content[number], { type: "image" }>;
+    const img = content[1] as Extract<(typeof content)[number], { type: "image" }>;
     expect(img.mimeType).toBe("image/jpeg");
 
-    const link = content[2] as Extract<typeof content[number], { type: "resource_link" }>;
+    const link = content[2] as Extract<(typeof content)[number], { type: "resource_link" }>;
     expect(link.uri).toBe("https://r2.example.com/cook_xyz/landscape/output.mp4");
     expect(link.mimeType).toBe("video/mp4");
     expect(link.description).toBe("1200x675 · 15s");
   });
 
-  it("completed video without poster_url → resource_link only", async () => {
+  it("completed video without poster_url → summary + resource_link only", async () => {
     const result: ReleaseResult = {
       ...baseResult,
       output: "video",
@@ -350,7 +399,7 @@ describe("buildRenderStatusContent", () => {
     const types = content.map((b) => b.type);
     expect(types).toEqual(["text", "resource_link"]);
 
-    const link = content[1] as Extract<typeof content[number], { type: "resource_link" }>;
+    const link = content[1] as Extract<(typeof content)[number], { type: "resource_link" }>;
     expect(link.mimeType).toBe("video/mp4");
     expect(link.name).toBe("landscape.mp4");
   });

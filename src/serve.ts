@@ -13,8 +13,16 @@ import { renderLoginPage } from "./oauth/login-page.js";
 const PORT = Number(process.env.PORT ?? 3000);
 const BRAGFAST_API_URL =
   process.env.BRAGFAST_API_URL ?? "https://brag.fast/api/v1";
-const OAUTH_CLIENTS_FILE =
-  process.env.OAUTH_CLIENTS_FILE ?? "./data/clients.json";
+function resolveOAuthClientsFile(): string {
+  if (process.env.OAUTH_CLIENTS_FILE) return process.env.OAUTH_CLIENTS_FILE;
+  // `./data` is often read-only on hosted deploys; /tmp survives for the process lifetime.
+  if (process.env.NODE_ENV === "production") {
+    return "/tmp/bragfast-oauth/clients.json";
+  }
+  return "./data/clients.json";
+}
+
+const OAUTH_CLIENTS_FILE = resolveOAuthClientsFile();
 const BASE_URL =
   process.env.BASE_URL ?? `http://localhost:${PORT}`;
 
