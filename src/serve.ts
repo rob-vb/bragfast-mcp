@@ -1,7 +1,25 @@
 #!/usr/bin/env node
+import { readFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import type { IncomingMessage } from "http";
+
+function readPackageVersion(): string {
+  try {
+    const pkgPath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../package.json"
+    );
+    return (JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string })
+      .version;
+  } catch {
+    return "unknown";
+  }
+}
+
+const PACKAGE_VERSION = readPackageVersion();
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
@@ -205,7 +223,7 @@ app.all("/mcp", async (req: Request, res: Response) => {
 
 // Health check
 app.get("/health", (_req: Request, res: Response) => {
-  res.json({ ok: true, service: "bragfast-mcp" });
+  res.json({ ok: true, service: "bragfast-mcp", version: PACKAGE_VERSION });
 });
 
 app.listen(PORT, () => {
